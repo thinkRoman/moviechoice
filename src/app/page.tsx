@@ -194,6 +194,7 @@ const initialShows: Title[] = [
 export default function Home() {
   const [activeTab, setActiveTab] = useState('picks');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [movies, setMovies] = useState<Title[]>(initialMovies);
   const [shows, setShows] = useState<Title[]>(initialShows);
 
@@ -321,58 +322,221 @@ export default function Home() {
         className={`fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#18181b] rounded-t-3xl shadow-2xl transition-transform duration-300 ${
           moreMenuOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
-        style={{ maxHeight: '70vh' }}
+        style={{ maxHeight: '80vh' }}
       >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-2">
           <div className="w-8 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
         </div>
 
-        <div className="px-5 pb-8 overflow-y-auto">
-          <h3 className="text-lg font-bold mb-4">More</h3>
-
-          {/* Friday Picks */}
-          <button
-            onClick={() => {
-              setMoreMenuOpen(false);
-              setActiveTab('picks');
-            }}
-            className="w-full flex items-center gap-3 py-3 px-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 mb-1"
-          >
-            <Clapperboard className="w-5 h-5" />
-            <span className="font-medium">Friday Picks</span>
-          </button>
-
-          <div className="h-px bg-gray-100 dark:bg-gray-800 my-2" />
-
-          {[
-            { icon: Film, label: 'Cinema' },
-            { icon: Compass, label: 'Explore Places' },
-            { icon: Bookmark, label: 'Watchlist' },
-            { icon: Clapperboard, label: 'Restaurant Log' },
-            { icon: MessageCircle, label: 'Ask Anything' },
-            { icon: Eye, label: 'Watched' },
-            { icon: Settings, label: 'Settings' },
-            { icon: Smartphone, label: 'Install on iPhone' },
-          ].map((item) => (
-            <button
-              key={item.label}
-              onClick={() => setMoreMenuOpen(false)}
-              className="w-full flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors"
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium text-sm">{item.label}</span>
+        {/* User Profile Card */}
+        <div className="mx-4 mb-4 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-2xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+              <span className="text-white font-bold text-lg">A</span>
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-gray-900 dark:text-white">Signed in as ashwani</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Tap below to change your PIN</p>
+            </div>
+            <button className="text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 px-3 py-1.5 rounded-full">
+              Switch
             </button>
-          ))}
+          </div>
+          <button className="mt-3 flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 font-medium">
+            <Settings className="w-3.5 h-3.5" />
+            Change my PIN
+          </button>
+        </div>
 
-          <div className="h-px bg-gray-100 dark:bg-gray-800 my-2" />
+        {/* Weekly Mix Card */}
+        <div className="mx-4 mb-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h3 className="font-bold text-gray-900 dark:text-white">Weekly mix</h3>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Film className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Movies</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">4</span>
+                <button className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-sm">+</button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clapperboard className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Shows</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">3</span>
+                <button className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-sm">+</button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">How recent</span>
+              </div>
+              <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Last 2 yrs</span>
+            </div>
+          </div>
+        </div>
 
-          <button className="w-full flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 text-red-500 transition-colors">
+        {/* Navigation Menu */}
+        <div className="mx-4 mb-4">
+          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-2 mb-2">
+            <button
+              onClick={() => {
+                setMoreMenuOpen(false);
+                setActiveTab('picks');
+              }}
+              className="w-full flex items-center gap-3 py-3 px-3 rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium"
+            >
+              <Clapperboard className="w-5 h-5" />
+              <span>Friday Picks</span>
+            </button>
+          </div>
+          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl overflow-hidden">
+            {[
+              { icon: Film, label: 'Cinema' },
+              { icon: Compass, label: 'Explore Places' },
+              { icon: Bookmark, label: 'Watchlist' },
+              { icon: Clapperboard, label: 'Restaurant Log' },
+              { icon: MessageCircle, label: 'Ask Anything' },
+              { icon: Eye, label: 'Watched' },
+              { icon: Settings, label: 'Settings' },
+              { icon: Smartphone, label: 'Install on iPhone' },
+            ].map((item) => (
+              <button
+                key={item.label}
+                onClick={() => {
+                  setMoreMenuOpen(false);
+                  if (item.label === 'Settings') setShowSettings(true);
+                }}
+                className="w-full flex items-center gap-3 py-3.5 px-4 hover:bg-white dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors"
+              >
+                <item.icon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                <span className="font-medium text-sm">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sign Out */}
+        <div className="mx-4 mb-6">
+          <button className="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors">
             <LogOut className="w-5 h-5" />
             <span className="font-medium text-sm">Sign Out</span>
           </button>
         </div>
       </div>
+
+      {/* Settings Overlay */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center" onClick={() => setShowSettings(false)}>
+          <div
+            className="w-full max-w-xl max-h-[85vh] bg-white dark:bg-[#18181b] sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="sticky top-0 bg-white dark:bg-[#18181b] border-b border-gray-100 dark:border-gray-800 px-5 py-4 flex items-center justify-between z-10">
+              <button onClick={() => setShowSettings(false)} className="text-purple-600 dark:text-purple-400 font-medium text-sm">
+                ✕ Cancel
+              </button>
+              <h2 className="font-bold text-gray-900 dark:text-white">Settings</h2>
+              <button className="text-purple-600 dark:text-purple-400 font-medium text-sm">Save</button>
+            </div>
+
+            <div className="p-5 space-y-6 pb-10">
+              {/* Account */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Account</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Profile</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Change PIN</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Notifications</span>
+                    <div className="w-10 h-6 bg-purple-600 rounded-full relative">
+                      <div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 shadow" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preferences */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Preferences</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Dark Mode</span>
+                    <div className="w-10 h-6 bg-purple-600 rounded-full relative">
+                      <div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 shadow" />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Language</span>
+                    <span className="text-sm text-purple-600 dark:text-purple-400">English</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Location</span>
+                    <span className="text-sm text-purple-600 dark:text-purple-400">San Francisco, CA</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Streaming Services */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Streaming Services</h3>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {['Netflix', 'Prime Video', 'Disney+', 'Apple TV+', 'Max', 'Hulu', 'Peacock', 'Starz', 'Tubi'].map((svc) => (
+                    <span key={svc} className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
+                      {svc}
+                      <span className="ml-1 cursor-pointer">×</span>
+                    </span>
+                  ))}
+                </div>
+                <button className="text-xs text-purple-600 dark:text-purple-400 font-medium">+ Add service</button>
+              </div>
+
+              {/* About */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">About</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Version</span>
+                    <span className="text-sm text-gray-400">0.1.0</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Privacy Policy</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Terms of Service</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sign Out */}
+              <button className="w-full py-3 bg-red-50 dark:bg-red-900/10 text-red-500 font-medium text-sm rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors">
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-[#0a0a0a]/90 backdrop-blur-xl border-t border-gray-100 dark:border-gray-800 z-30">
