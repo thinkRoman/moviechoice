@@ -1,12 +1,13 @@
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
-import Resend from 'next-auth/providers/resend';
 import Credentials from 'next-auth/providers/credentials';
 import dbConnect from '@/lib/mongodb';
 import VerificationCode from '@/models/VerificationCode';
 import Profile from '@/models/Profile';
+import User from '@/models/User';
+import { normalizePhone, generateOtp, hashOtp, verifyOtp } from '@/lib/otp';
 
-// Extend NextAuth types
+// Extended session shape
 declare module 'next-auth' {
   interface User {
     phoneNumber?: string;
@@ -14,20 +15,33 @@ declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
-      phoneNumber?: string;
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
+      phoneNumber?: string | null;
     };
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    id: string;
+    phoneNumber?: string | null;
   }
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    }),
-    Resend({
-      apiKey: process.env.RESEND_API_KEY || '',
-      from: process.env.EMAIL_FROM || 'admin@mail.thinkroman.com',
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      authorization: {
+        params: {
+          prompt: 'consent',
+          access_type: 'offline',
+          response_type: 'code',
+        },
+      },
     }),
     Credentials({
       name: 'WhatsApp OTP',
@@ -44,54 +58,105 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           phoneNumber: credentials.phoneNumber as string,
           type: 'whatsapp',
           verified: true,
-          expiresAt: { $gte: new Date() },
-        }).select('+code');
+        }).select('+codeHash +codeSalt');
 
         if (!record) return null;
 
-        // Find or create user profile
-        let profile = await Profile.findOne({
-          userId: `whatsapp:${credentials.phoneNumber}`,
-        });
+        // Find or create canonical User
+        const normalizedPhone = normalizePhone(credentials.phoneNumber as string);
+        let user = await User.findOne({ 'providers.whatsapp.phoneNumber': normalizedPhone });
 
+        if (!user) {
+          // Fallback: find by phone field
+          user = await User.findOne({ phone: normalizedPhone });
+        }
+
+        if (!user) {
+          user = await User.create({
+            name: `User ${normalizedPhone}`,
+            email: '',
+            phone: normalizedPhone,
+            phoneVerified: new Date(),
+            providers: { whatsapp: { phoneNumber: normalizedPhone } },
+          });
+        } else {
+          // Link WhatsApp provider if not already linked
+          if (!user.providers?.whatsapp) {
+            user.providers = {
+              ...(user.providers || {}),
+              whatsapp: { phoneNumber: normalizedPhone },
+            };
+            await user.save();
+          }
+        }
+
+        // Ensure profile exists
+        let profile = await Profile.findOne({ userId: user._id.toString() });
         if (!profile) {
           profile = await Profile.create({
-            userId: `whatsapp:${credentials.phoneNumber}`,
-            name: `User ${credentials.phoneNumber}`,
-            isPrimary: (await Profile.countDocuments({ userId: { $ne: credentials.phoneNumber } })) === 0,
+            userId: user._id.toString(),
+            name: user.name || `User ${normalizedPhone}`,
+            isPrimary: true,
             preferences: { genres: [], streamingServices: [] },
             tasteSignals: { thumbsUp: [], thumbsDown: [], ratings: [] },
           });
         }
 
         return {
-          id: profile._id.toString(),
-          name: profile.name,
-          phoneNumber: credentials.phoneNumber as string,
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email || undefined,
+          image: user.image || undefined,
+          phoneNumber: normalizedPhone,
         };
       },
     }),
   ],
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   jwt: {
     secret: process.env.NEXTAUTH_SECRET,
   },
   callbacks: {
-    session({ session, token }) {
+    async signIn({ user, account }) {
+      if (account?.provider === 'google') {
+        void dbConnect();
+        // Find or create canonical User
+        let profile = await Profile.findOne({ userId: user?.id });
+        if (!profile && user?.id) {
+          profile = await Profile.create({
+            userId: user.id,
+            name: user.name || 'Google User',
+            isPrimary: true,
+            preferences: { genres: [], streamingServices: [] },
+            tasteSignals: { thumbsUp: [], thumbsDown: [], ratings: [] },
+          });
+        }
+      }
+      return true;
+    },
+    async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.sub || session.user.id;
-        session.user.phoneNumber = token.phoneNumber as string | undefined;
+        session.user.id = token.id || session.user.id;
+        session.user.name = token.name ?? session.user.name ?? null;
+        session.user.email = token.email ?? session.user.email ?? null;
+        session.user.image = token.image ?? session.user.image ?? null;
+        session.user.phoneNumber = token.phoneNumber ?? null;
       }
       return session;
     },
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
-        token.phoneNumber = (user as any).phoneNumber;
+        token.id = user.id;
+        token.phoneNumber = (user as any).phoneNumber ?? null;
+        token.name = user.name ?? null;
+        token.email = user.email ?? null;
+        token.image = user.image ?? null;
       }
       return token;
     },
   },
+  trustHost: true,
 });

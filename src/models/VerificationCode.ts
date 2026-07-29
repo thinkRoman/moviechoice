@@ -4,10 +4,15 @@ export interface IVerificationCode {
   _id: string;
   phoneNumber: string;
   email: string;
-  code: string;
+  codeHash: string;
+  codeSalt: string;
   type: 'whatsapp' | 'email';
   expiresAt: Date;
   verified: boolean;
+  verifiedAt: Date | null;
+  attemptCount: number;
+  maxAttempts: number;
+  lastAttemptAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -16,10 +21,15 @@ const VerificationCodeSchema = new Schema<IVerificationCode>(
   {
     phoneNumber: { type: String, select: false },
     email: { type: String, select: false },
-    code: { type: String, required: true, select: false },
+    codeHash: { type: String, required: true, select: false },
+    codeSalt: { type: String, required: true, select: false },
     type: { type: String, enum: ['whatsapp', 'email'], required: true },
     expiresAt: { type: Date, required: true, index: { expires: '0s' } },
     verified: { type: Boolean, default: false },
+    verifiedAt: { type: Date, default: null },
+    attemptCount: { type: Number, default: 0 },
+    maxAttempts: { type: Number, default: 5 },
+    lastAttemptAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
