@@ -5,7 +5,7 @@ import dbConnect from '@/lib/mongodb';
 import VerificationCode from '@/models/VerificationCode';
 import Profile from '@/models/Profile';
 import User from '@/models/User';
-import { normalizePhone, generateOtp, hashOtp, verifyOtp } from '@/lib/otp';
+import { normalizePhone } from '@/lib/otp';
 
 // Extended session shape
 declare module 'next-auth' {
@@ -20,13 +20,6 @@ declare module 'next-auth' {
       image?: string | null;
       phoneNumber?: string | null;
     };
-  }
-}
-
-declare module 'next-auth/jwt' {
-  interface JWT {
-    id: string;
-    phoneNumber?: string | null;
   }
 }
 
@@ -116,9 +109,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  jwt: {
-    secret: process.env.NEXTAUTH_SECRET,
-  },
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === 'google') {
@@ -139,21 +129,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id || session.user.id;
-        session.user.name = token.name ?? session.user.name ?? null;
-        session.user.email = token.email ?? session.user.email ?? null;
-        session.user.image = token.image ?? session.user.image ?? null;
-        session.user.phoneNumber = token.phoneNumber ?? null;
+        session.user.id = String(token.id || '');
+        session.user.name = (token.name as string | null) ?? session.user.name ?? null;
+        session.user.email = (token.email as string | null) ?? session.user.email ?? null;
+        session.user.image = (token.image as string | null) ?? session.user.image ?? null;
+        session.user.phoneNumber = (token.phoneNumber as string | null) ?? undefined;
       }
       return session;
     },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.phoneNumber = (user as any).phoneNumber ?? null;
-        token.name = user.name ?? null;
-        token.email = user.email ?? null;
-        token.image = user.image ?? null;
+        (token as any).phoneNumber = (user as any).phoneNumber ?? null;
+        (token as any).name = user.name ?? null;
+        (token as any).email = user.email ?? null;
+        (token as any).image = user.image ?? null;
       }
       return token;
     },

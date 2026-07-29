@@ -31,7 +31,7 @@ export function generateOtp(): string {
 export function hashOtp(otp: string): { hash: string; salt: string } {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const saltHex = Buffer.from(salt).toString('hex');
-  const hash = scryptSync(otp, saltHex, 64, { N: 32768, r: 8, p: 1, dklen: 64 });
+  const hash = scryptSync(otp, saltHex, 64, { N: 32768, r: 8, p: 1 });
   return { hash: hash.toString('hex'), salt: saltHex };
 }
 
@@ -40,7 +40,7 @@ export function hashOtp(otp: string): { hash: string; salt: string } {
  * Returns true if the code matches.
  */
 export function verifyOtp(otp: string, storedHash: string, salt: string): boolean {
-  const computed = scryptSync(otp, salt, 64, { N: 32768, r: 8, p: 1, dklen: 64 });
+  const computed = scryptSync(otp, salt, 64, { N: 32768, r: 8, p: 1 });
   const computedHash = computed.toString('hex');
   if (computedHash.length !== storedHash.length) return false;
   const storedBuffer = Buffer.from(storedHash, 'hex');

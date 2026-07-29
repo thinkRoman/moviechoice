@@ -2,7 +2,7 @@ import { Schema, model, models } from 'mongoose';
 
 export interface IProfile {
   _id: string;
-  userId: string;
+  userId: Schema.Types.ObjectId;
   name: string;
   avatar?: string;
   ageRange?: '13+' | '16+' | '18+';
@@ -22,7 +22,7 @@ export interface IProfile {
 
 const ProfileSchema = new Schema<IProfile>(
   {
-    userId: { type: String, required: true, index: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true, unique: true },
     name: { type: String, required: true },
     avatar: { type: String },
     ageRange: { type: String, enum: ['13+', '16+', '18+'] },
@@ -42,6 +42,7 @@ const ProfileSchema = new Schema<IProfile>(
   { timestamps: true }
 );
 
-ProfileSchema.index({ userId: 1 });
+// Unique index on userId to prevent duplicate profiles
+ProfileSchema.index({ userId: 1 }, { unique: true });
 
 export default models.Profile || model<IProfile>('Profile', ProfileSchema);
