@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import {
   Clapperboard,
   Compass,
@@ -292,7 +293,7 @@ export default function Home() {
 
             {/* Footer note */}
             <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-8 mb-4">
-              👍 and 👎 your Watched list shape next Friday's picks. Open on Friday and it refreshes itself.
+              👍 and 👎 your Watched list shape next Friday&amp;apos;s picks. Open on Friday and it refreshes itself.
             </p>
           </>
         )}
@@ -596,10 +597,13 @@ function TitleCard({
           {/* Poster */}
           <div className="flex-shrink-0 w-20 h-28 rounded-xl overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600">
             {title.posterUrl ? (
-              <img
+              <Image
                 src={title.posterUrl}
                 alt={title.title}
+                width={80}
+                height={112}
                 className="w-full h-full object-cover"
+                unoptimized
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">

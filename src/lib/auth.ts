@@ -110,19 +110,107 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       if (account?.provider === 'google') {
-        void dbConnect();
-        // Find or create canonical User
-        let profile = await Profile.findOne({ userId: user?.id });
-        if (!profile && user?.id) {
-          profile = await Profile.create({
-            userId: user.id,
-            name: user.name || 'Google User',
-            isPrimary: true,
-            preferences: { genres: [], streamingServices: [] },
-            tasteSignals: { thumbsUp: [], thumbsDown: [], ratings: [] },
+        try {
+          await dbConnect();
+
+          // account.providerAccountId is the Google OAuth provider account ID
+          const providerAccountId = account?.providerAccountId;
+          const email = profile?.email || user.email;
+          const name = profile?.name || user.name;
+          const image = profile?.image || user.image;
+          // Google returns email_verified as boolean; we set emailVerified to now if true
+          const emailVerified =
+            profile?.email_verified === true ? new Date() : null;
+
+          // 1. Match by Google providerAccountId first (canonical link)
+          let existingByProvider = await User.findOne({
+            'providers.google.providerAccountId': providerAccountId,
+          }).lean();
+
+          if (existingByProvider) {
+            // Reuse existing User — update profile fields in case they changed
+            await User.updateOne(
+              { _id: existingByProvider._id },
+              {
+                $set: {
+                  name: name || existingByProvider.name,
+                  email: email || existingByProvider.email,
+                  emailVerified: emailVerified
+                    ? new Date(emailVerified)
+                    : existingByProvider.emailVerified,
+                  image: image || existingByProvider.image,
+                  updatedAt: new Date(),
+                },
+              },
+            );
+            user.id = existingByProvider._id.toString();
+            return true;
+          }
+
+          // 2. Fallback: match by normalized email (controlled fallback)
+          if (email) {
+            const normalizedEmail = email.toLowerCase().trim();
+            const existingByEmail = await User.findOne({
+              email: normalizedEmail,
+            }).lean();
+
+            if (existingByEmail) {
+              // Link Google provider to existing User
+              await User.updateOne(
+                { _id: existingByEmail._id },
+                {
+                  $set: {
+                    'providers.google.providerAccountId': providerAccountId,
+                    name: name || existingByEmail.name,
+                    email: existingByEmail.email,
+                    emailVerified: emailVerified
+                      ? new Date(emailVerified)
+                      : existingByEmail.emailVerified,
+                    image: image || existingByEmail.image,
+                    updatedAt: new Date(),
+                  },
+                },
+              );
+              user.id = existingByEmail._id.toString();
+              return true;
+            }
+          }
+
+          // 3. No match found — create new canonical User
+          const newUser = await User.create({
+            name: name || 'Google User',
+            email: email || '',
+            emailVerified: emailVerified ? new Date(emailVerified) : null,
+            phone: '',
+            phoneVerified: null,
+            image: image || null,
+            providers: {
+              google: { providerAccountId },
+            },
           });
+
+          user.id = newUser._id.toString();
+
+          // 4. Create canonical profile for this User (idempotent via unique index)
+          await Profile.findOneAndUpdate(
+            { userId: newUser._id },
+            {
+              $setOnInsert: {
+                name: name || 'Google User',
+                isPrimary: true,
+                preferences: { genres: [], streamingServices: [] },
+                tasteSignals: { thumbsUp: [], thumbsDown: [], ratings: [] },
+              },
+            },
+            { upsert: true, new: true },
+          );
+
+          return true;
+        } catch (err) {
+          console.error('[Google signIn error]', err);
+          return '/signin?error=google_auth_failed';
         }
       }
       return true;
