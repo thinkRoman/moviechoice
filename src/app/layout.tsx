@@ -13,12 +13,10 @@ export const metadata: Metadata = {
   description:
     'Eliminate streaming decision fatigue with personalized recommendations in seconds.',
   manifest: '/manifest.json',
+};
+
+export const viewport = {
   themeColor: '#7c3aed',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'MovieChoice',
-  },
 };
 
 export default function RootLayout({

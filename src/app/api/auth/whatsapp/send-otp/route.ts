@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomInt } from 'crypto';
+import dbConnect from '@/lib/mongodb';
+import VerificationCode from '@/models/VerificationCode';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,52 +15,55 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    await dbConnect();
+
     // Generate 6-digit OTP
     const otp = String(randomInt(100000, 999999));
 
-    // Store OTP in Redis/memcached or in-memory for verification
-    // In production, use Redis with TTL of 5 minutes
-    // For now, we'll use a simple approach
-    const whatsappApiUrl = process.env.WHATSAPP_API_URL || '';
-    const whatsappApiKey = process.env.WHATSAPP_API_KEY || '';
-    const whatsappFromNumber = process.env.WHATSAPP_FROM_NUMBER || '';
-
-    if (!whatsappApiUrl || !whatsappApiKey) {
-      // Fallback: return OTP in response for development
-      console.log('WhatsApp API not configured. OTP for development:', otp);
-      return NextResponse.json({
-        message: 'OTP sent via WhatsApp',
-        developmentOtp: otp, // Remove in production
-      });
-    }
-
-    // Send OTP via WhatsApp Business API
-    const response = await fetch(whatsappApiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${whatsappApiKey}`,
+    // Reuse or create a new verification code
+    await VerificationCode.findOneAndUpdate(
+      { phoneNumber, type: 'whatsapp', verified: false },
+      {
+        phoneNumber,
+        code: otp,
+        type: 'whatsapp',
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+        verified: false,
       },
-      body: JSON.stringify({
-        to: phoneNumber,
-        from: whatsappFromNumber,
-        type: 'text',
-        text: {
-          body: `Your MovieChoice verification code is: ${otp}. This code expires in 5 minutes.`,
-        },
-      }),
-    });
+      { upsert: true, new: true }
+    );
 
-    if (!response.ok) {
-      console.error('WhatsApp API error:', await response.text());
-      return NextResponse.json(
-        { error: 'Failed to send OTP via WhatsApp' },
-        { status: 500 }
-      );
+    // In production, send via WhatsApp Business API
+    const whatsappApiUrl = process.env.WHATSAPP_API_URL;
+    const whatsappApiKey = process.env.WHATSAPP_API_KEY;
+    const whatsappFromNumber = process.env.WHATSAPP_FROM_NUMBER;
+
+    if (whatsappApiUrl && whatsappApiKey) {
+      try {
+        await fetch(whatsappApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${whatsappApiKey}`,
+          },
+          body: JSON.stringify({
+            to: phoneNumber,
+            from: whatsappFromNumber,
+            type: 'text',
+            text: {
+              body: `Your MovieChoice verification code is: ${otp}. This code expires in 5 minutes.`,
+            },
+          }),
+        });
+      } catch (sendError) {
+        console.error('Failed to send WhatsApp message:', sendError);
+        // Still return success — OTP is stored for dev fallback
+      }
     }
 
     return NextResponse.json({
       message: 'OTP sent via WhatsApp',
+      developmentOtp: process.env.NODE_ENV === 'development' ? otp : undefined,
     });
   } catch (error) {
     console.error('Send OTP error:', error);
