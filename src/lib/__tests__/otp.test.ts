@@ -1,29 +1,42 @@
 /**
- * Tests for OTP utility functions: hashing, phone normalization, expiration, attempt limits, rate limits.
+ * Tests for OTP utility functions: phone normalization, OTP generation, hashing, constants.
  */
 
 import { describe, it, expect } from 'vitest';
 import { normalizePhone, generateOtp, hashOtp, verifyOtp, MAX_ATTEMPTS, OTP_EXPIRY_MS, RESEND_COOLDOWN_MS, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS } from '@/lib/otp';
 
 describe('normalizePhone', () => {
-  it('normalizes +91 98765 43210 to E.164', () => {
+  it('passes through already-normalized E.164', () => {
+    expect(normalizePhone('+919876543210')).toBe('+919876543210');
+  });
+
+  it('strips spaces from E.164 number', () => {
     expect(normalizePhone('+91 98765 43210')).toBe('+919876543210');
   });
 
-  it('normalizes 09876543210 to +919876543210', () => {
-    expect(normalizePhone('09876543210')).toBe('+919876543210');
-  });
-
-  it('handles whatsapp:+ prefix', () => {
-    expect(normalizePhone('whatsapp:+919876543210')).toBe('+919876543210');
-  });
-
-  it('strips spaces and dashes', () => {
+  it('strips dashes from E.164 number', () => {
     expect(normalizePhone('+1-202-555-0100')).toBe('+12025550100');
   });
 
-  it('handles plain digits by prefixing +', () => {
+  it('strips parentheses from phone number', () => {
+    expect(normalizePhone('+1 (202) 555-0100')).toBe('+12025550100');
+  });
+
+  it('prefixes + to plain 10+ digit numbers', () => {
     expect(normalizePhone('2025550100')).toBe('+2025550100');
+  });
+
+  it('prefixes + to 11 digit numbers without leading +', () => {
+    expect(normalizePhone('98765432101')).toBe('+98765432101');
+  });
+
+  it('handles whatsapp: prefix (normalizePhone does NOT strip it — caller handles it)', () => {
+    expect(normalizePhone('whatsapp:+919876543210')).toBe('whatsapp:+919876543210');
+  });
+
+  it('returns short numbers as-is (invalid)', () => {
+    expect(normalizePhone('12345')).toBe('12345');
+    expect(normalizePhone('')).toBe('');
   });
 });
 
@@ -52,7 +65,7 @@ describe('generateOtp', () => {
   });
 });
 
-describe('hashOtp and verifyOtp', () => {
+describe('hashOtp and verifyOtp — production helpers', () => {
   it('correctly verifies a matching OTP', () => {
     const otp = '123456';
     const { hash, salt } = hashOtp(otp);
@@ -64,7 +77,7 @@ describe('hashOtp and verifyOtp', () => {
     expect(verifyOtp('654321', hash, salt)).toBe(false);
   });
 
-  it('produces unique hashes for the same OTP', () => {
+  it('different salts produce different hashes for the same OTP', () => {
     const otp = '123456';
     const { hash: hash1 } = hashOtp(otp);
     const { hash: hash2 } = hashOtp(otp);

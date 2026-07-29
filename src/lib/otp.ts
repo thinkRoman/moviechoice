@@ -31,7 +31,9 @@ export function generateOtp(): string {
 export function hashOtp(otp: string): { hash: string; salt: string } {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const saltHex = Buffer.from(salt).toString('hex');
-  const hash = scryptSync(otp, saltHex, 64, { N: 32768, r: 8, p: 1 });
+  // Node.js v22+ enforces a default maxmem for scrypt. With N:32768, r:8, p:1
+  // we need ~32 MB. Explicit maxmem avoids "memory limit exceeded" in all runtimes.
+  const hash = scryptSync(otp, saltHex, 64, { N: 32768, r: 8, p: 1, maxmem: 128 * 1024 * 1024 });
   return { hash: hash.toString('hex'), salt: saltHex };
 }
 
@@ -40,7 +42,8 @@ export function hashOtp(otp: string): { hash: string; salt: string } {
  * Returns true if the code matches.
  */
 export function verifyOtp(otp: string, storedHash: string, salt: string): boolean {
-  const computed = scryptSync(otp, salt, 64, { N: 32768, r: 8, p: 1 });
+  // Same maxmem as hashOtp — Node.js v22+ default is too low for N:32768
+  const computed = scryptSync(otp, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 128 * 1024 * 1024 });
   const computedHash = computed.toString('hex');
   if (computedHash.length !== storedHash.length) return false;
   const storedBuffer = Buffer.from(storedHash, 'hex');
