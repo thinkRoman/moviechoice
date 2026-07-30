@@ -6,17 +6,28 @@ import { auth } from '@/lib/auth';
 import SiteHeader from '@/components/site-header';
 import { listLibrary, type LibraryItem } from '@/lib/movie-library';
 import { movieLibraryRepository } from '@/lib/movie-library-repository';
+import LibraryActions from '@/components/library-actions';
+import type { LibraryAction } from '@/lib/movie-library';
 
 export const dynamic = 'force-dynamic';
 
-function LibraryCard({ item, showWatchedAt = false }: { item: LibraryItem; showWatchedAt?: boolean }) {
+function LibraryCard({
+  item,
+  showWatchedAt = false,
+  listAction,
+}: {
+  item: LibraryItem;
+  showWatchedAt?: boolean;
+  listAction: LibraryAction;
+}) {
   const posterUrl = item.posterPath
     ? `https://image.tmdb.org/t/p/w500${item.posterPath}`
     : null;
 
   return (
-    <Link href={`/movies/${item.tmdbMovieId}`} className="group block min-w-0">
-      <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/10 transition duration-300 group-hover:-translate-y-1 group-hover:ring-violet-400/40">
+    <article className="min-w-0">
+      <Link href={`/movies/${item.tmdbMovieId}`} className="group block min-w-0">
+        <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/10 transition duration-300 group-hover:-translate-y-1 group-hover:ring-violet-400/40">
         {posterUrl ? (
           <Image
             src={posterUrl}
@@ -28,14 +39,24 @@ function LibraryCard({ item, showWatchedAt = false }: { item: LibraryItem; showW
         ) : (
           <div className="flex h-full items-center justify-center px-4 text-center text-sm text-zinc-600">Poster unavailable</div>
         )}
-      </div>
-      <h3 className="mt-3 truncate text-sm font-semibold text-white">{item.title}</h3>
-      <p className="mt-1 text-xs text-zinc-500">
-        {showWatchedAt && item.watchedAt
-          ? `Watched ${new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(item.watchedAt))}`
-          : item.releaseYear || 'Release year unavailable'}
-      </p>
-    </Link>
+        </div>
+        <h3 className="mt-3 truncate text-sm font-semibold text-white">{item.title}</h3>
+        <p className="mt-1 text-xs text-zinc-500">
+          {showWatchedAt && item.watchedAt
+            ? `Watched ${new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(item.watchedAt))}`
+            : item.releaseYear || 'Release year unavailable'}
+        </p>
+      </Link>
+      <LibraryActions
+        listAction={listAction}
+        movie={{
+          tmdbMovieId: item.tmdbMovieId,
+          title: item.title,
+          posterPath: item.posterPath,
+          releaseYear: item.releaseYear,
+        }}
+      />
+    </article>
   );
 }
 
@@ -46,6 +67,7 @@ function LibrarySection({
   icon: Icon,
   items,
   showWatchedAt = false,
+  listAction,
 }: {
   id: string;
   title: string;
@@ -53,6 +75,7 @@ function LibrarySection({
   icon: typeof Bookmark;
   items: LibraryItem[];
   showWatchedAt?: boolean;
+  listAction: LibraryAction;
 }) {
   return (
     <section id={id} className="scroll-mt-24 py-8 sm:py-10">
@@ -67,7 +90,7 @@ function LibrarySection({
       </div>
       {items.length ? (
         <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 sm:gap-x-5 md:grid-cols-4 lg:grid-cols-6">
-          {items.map((item) => <LibraryCard key={item.id} item={item} showWatchedAt={showWatchedAt} />)}
+          {items.map((item) => <LibraryCard key={item.id} item={item} showWatchedAt={showWatchedAt} listAction={listAction} />)}
         </div>
       ) : (
         <div className="mt-6 rounded-3xl border border-dashed border-white/10 bg-white/[0.025] px-6 py-10 text-center">
@@ -113,9 +136,9 @@ export default async function MyMoviesPage() {
             </a>
           ))}
         </nav>
-        <LibrarySection id="watchlist" title="Watchlist" description="Movies saved for later." icon={Bookmark} items={watchlist} />
-        <LibrarySection id="watched" title="Watched" description="Your viewing history." icon={Eye} items={watched} showWatchedAt />
-        <LibrarySection id="favorites" title="Favorites" description="The ones worth remembering." icon={Heart} items={favorites} />
+        <LibrarySection id="watchlist" title="Watchlist" description="Movies saved for later." icon={Bookmark} items={watchlist} listAction="watchlist" />
+        <LibrarySection id="watched" title="Watched" description="Your viewing history." icon={Eye} items={watched} showWatchedAt listAction="watched" />
+        <LibrarySection id="favorites" title="Favorites" description="The ones worth remembering." icon={Heart} items={favorites} listAction="favorite" />
       </div>
     </main>
   );

@@ -36,12 +36,15 @@ function createRepository(): MovieLibraryRepository {
         inWatchlist: current?.inWatchlist || false,
         watched: current?.watched || false,
         favorite: current?.favorite || false,
+        dismissed: current?.dismissed || false,
         watchedAt: current?.watchedAt || null,
         createdAt: current?.createdAt || new Date().toISOString(),
         [field]: value,
         ...(action === 'watched' ? { watchedAt: value ? new Date().toISOString() : null } : {}),
+        ...(action === 'watched' && value ? { inWatchlist: false } : {}),
+        ...(action === 'dismissed' && value ? { inWatchlist: false, favorite: false } : {}),
       };
-      if (!item.inWatchlist && !item.watched && !item.favorite) {
+      if (!item.inWatchlist && !item.watched && !item.favorite && !item.dismissed) {
         records.delete(recordKey);
         return null;
       }
@@ -69,6 +72,21 @@ describe('personal movie library', () => {
     const item = await updateLibrary('user-a', inception, 'watched', true, repository);
     expect(item?.watched).toBe(true);
     expect(item?.watchedAt).toBeTruthy();
+  });
+
+  it('removes a watched movie from the watchlist to keep the queue clean', async () => {
+    const repository = createRepository();
+    await updateLibrary('user-a', inception, 'watchlist', true, repository);
+    const item = await updateLibrary('user-a', inception, 'watched', true, repository);
+    expect(item).toMatchObject({ watched: true, inWatchlist: false });
+  });
+
+  it('persists a not-for-me signal and clears positive list signals', async () => {
+    const repository = createRepository();
+    await updateLibrary('user-a', inception, 'watchlist', true, repository);
+    await updateLibrary('user-a', inception, 'favorite', true, repository);
+    const item = await updateLibrary('user-a', inception, 'dismissed', true, repository);
+    expect(item).toMatchObject({ dismissed: true, inWatchlist: false, favorite: false });
   });
 
   it('unmarks watched and clears watchedAt', async () => {

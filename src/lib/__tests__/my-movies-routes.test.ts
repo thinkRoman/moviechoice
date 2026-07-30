@@ -64,4 +64,42 @@ describe('My Movies API authorization', () => {
       true,
     );
   });
+
+  it('accepts a durable not-for-me preference for the signed-in user', async () => {
+    mocks.auth.mockResolvedValue({ user: { id: 'user-a' } });
+    mocks.setFlag.mockResolvedValue({
+      id: 'item-a',
+      tmdbMovieId: 27205,
+      title: 'Inception',
+      posterPath: '/poster.jpg',
+      releaseYear: '2010',
+      inWatchlist: false,
+      watched: false,
+      favorite: false,
+      dismissed: true,
+      watchedAt: null,
+      createdAt: new Date().toISOString(),
+    });
+    const request = new NextRequest('http://localhost/api/my-movies/27205', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'dismissed',
+        value: true,
+        title: 'Inception',
+        posterPath: '/poster.jpg',
+        releaseYear: '2010',
+      }),
+    });
+    const response = await PUT(request, {
+      params: Promise.resolve({ tmdbMovieId: '27205' }),
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.setFlag).toHaveBeenCalledWith(
+      'user-a',
+      expect.objectContaining({ tmdbMovieId: 27205 }),
+      'dismissed',
+      true,
+    );
+  });
 });

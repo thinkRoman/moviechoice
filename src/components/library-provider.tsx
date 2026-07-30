@@ -52,10 +52,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       inWatchlist: previous?.inWatchlist || false,
       watched: previous?.watched || false,
       favorite: previous?.favorite || false,
+      dismissed: previous?.dismissed || false,
       watchedAt: previous?.watchedAt || null,
       createdAt: previous?.createdAt || new Date().toISOString(),
       [field]: nextValue,
       ...(action === 'watched' ? { watchedAt: nextValue ? new Date().toISOString() : null } : {}),
+      ...(action === 'watched' && nextValue ? { inWatchlist: false } : {}),
+      ...(action === 'dismissed' && nextValue ? { inWatchlist: false, favorite: false } : {}),
     };
     const key = `${movie.tmdbMovieId}:${action}`;
     setPendingKey(key);
@@ -80,7 +83,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           ? nextValue ? 'Saved to your watchlist.' : 'Removed from your watchlist.'
           : action === 'watched'
             ? nextValue ? 'Marked as watched.' : 'Moved back to unwatched.'
-            : nextValue ? 'Added to favorites.' : 'Removed from favorites.',
+            : action === 'favorite'
+              ? nextValue ? 'Added to favorites.' : 'Removed from favorites.'
+              : nextValue ? 'Got it — we won’t recommend this again.' : 'This title can be recommended again.',
       );
     } catch {
       setItems((current) => {
@@ -108,7 +113,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       {message ? (
         <div
           role="status"
-          className="fixed bottom-5 left-1/2 z-[100] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-white/10 bg-zinc-900/95 px-4 py-3 text-center text-sm font-medium text-white shadow-2xl backdrop-blur"
+          className="fixed bottom-24 left-1/2 z-[100] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-white/10 bg-zinc-900/95 px-4 py-3 text-center text-sm font-medium text-white shadow-2xl backdrop-blur sm:bottom-5"
         >
           {message}
           <button onClick={() => setMessage('')} className="ml-3 text-violet-300" aria-label="Dismiss notification">×</button>

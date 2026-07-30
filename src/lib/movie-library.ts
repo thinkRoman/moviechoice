@@ -1,4 +1,4 @@
-export type LibraryAction = 'watchlist' | 'watched' | 'favorite';
+export type LibraryAction = 'watchlist' | 'watched' | 'favorite' | 'dismissed';
 
 export interface LibraryMovieInput {
   tmdbMovieId: number;
@@ -12,6 +12,7 @@ export interface LibraryItem extends LibraryMovieInput {
   inWatchlist: boolean;
   watched: boolean;
   favorite: boolean;
+  dismissed: boolean;
   watchedAt: string | null;
   createdAt: string;
 }

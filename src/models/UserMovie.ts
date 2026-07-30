@@ -10,6 +10,7 @@ export interface IUserMovie {
   inWatchlist: boolean;
   watched: boolean;
   favorite: boolean;
+  dismissed: boolean;
   watchedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -25,6 +26,7 @@ const UserMovieSchema = new Schema<IUserMovie>(
     inWatchlist: { type: Boolean, default: false },
     watched: { type: Boolean, default: false },
     favorite: { type: Boolean, default: false },
+    dismissed: { type: Boolean, default: false },
     watchedAt: { type: Date, default: null },
   },
   { timestamps: true },

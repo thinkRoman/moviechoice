@@ -16,6 +16,7 @@ function serialize(item: {
   inWatchlist: boolean;
   watched: boolean;
   favorite: boolean;
+  dismissed: boolean;
   watchedAt: Date | null;
   createdAt: Date;
 }): LibraryItem {
@@ -28,15 +29,17 @@ function serialize(item: {
     inWatchlist: item.inWatchlist,
     watched: item.watched,
     favorite: item.favorite,
+    dismissed: Boolean(item.dismissed),
     watchedAt: item.watchedAt?.toISOString() ?? null,
     createdAt: item.createdAt.toISOString(),
   };
 }
 
-const fieldByAction: Record<LibraryAction, 'inWatchlist' | 'watched' | 'favorite'> = {
+const fieldByAction: Record<LibraryAction, 'inWatchlist' | 'watched' | 'favorite' | 'dismissed'> = {
   watchlist: 'inWatchlist',
   watched: 'watched',
   favorite: 'favorite',
+  dismissed: 'dismissed',
 };
 
 export const movieLibraryRepository: MovieLibraryRepository = {
@@ -56,6 +59,11 @@ export const movieLibraryRepository: MovieLibraryRepository = {
       releaseYear: movie.releaseYear,
     };
     if (action === 'watched') set.watchedAt = value ? new Date() : null;
+    if (action === 'watched' && value) set.inWatchlist = false;
+    if (action === 'dismissed' && value) {
+      set.inWatchlist = false;
+      set.favorite = false;
+    }
 
     const item = await UserMovie.findOneAndUpdate(
       { userId, tmdbMovieId: movie.tmdbMovieId },
@@ -64,7 +72,7 @@ export const movieLibraryRepository: MovieLibraryRepository = {
     );
 
     if (!item) return null;
-    if (!item.inWatchlist && !item.watched && !item.favorite) {
+    if (!item.inWatchlist && !item.watched && !item.favorite && !item.dismissed) {
       await UserMovie.deleteOne({ _id: item._id, userId });
       return null;
     }

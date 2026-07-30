@@ -8,7 +8,7 @@ import {
 import { movieLibraryRepository } from '@/lib/movie-library-repository';
 
 const updateSchema = z.object({
-  action: z.enum(['watchlist', 'watched', 'favorite']),
+  action: z.enum(['watchlist', 'watched', 'favorite', 'dismissed']),
   value: z.boolean(),
   title: z.string().trim().min(1).max(300),
   posterPath: z.string().nullable(),

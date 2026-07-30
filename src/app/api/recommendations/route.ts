@@ -69,10 +69,13 @@ export async function POST(request: Request) {
 
   const effectiveSettings = parsed.data;
 
-  const watched = await UserMovie.find({ userId: session.user.id, watched: true })
+  const suppressed = await UserMovie.find({
+    userId: session.user.id,
+    $or: [{ watched: true }, { dismissed: true }],
+  })
     .select('tmdbMovieId')
     .lean();
-  const watchedIds = new Set(watched.map((item) => item.tmdbMovieId));
+  const watchedIds = new Set(suppressed.map((item) => item.tmdbMovieId));
   const providerQuery = effectiveSettings.providerIds.join('|');
   const genreQuery = effectiveSettings.genreIds.filter((id) => id !== 99).join('|');
   const earliest = `${new Date().getUTCFullYear() - effectiveSettings.yearsBack}-01-01`;
