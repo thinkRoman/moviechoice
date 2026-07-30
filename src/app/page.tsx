@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
+import { signOut, useSession } from 'next-auth/react';
 import {
   Clapperboard,
   Compass,
@@ -193,6 +195,7 @@ const initialShows: Title[] = [
 ];
 
 export default function Home() {
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState('picks');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -431,7 +434,7 @@ export default function Home() {
 
         {/* Sign Out */}
         <div className="mx-4 mb-6">
-          <button className="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors">
+          <button onClick={() => void signOut({ callbackUrl: '/signin' })} className="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors">
             <LogOut className="w-5 h-5" />
             <span className="font-medium text-sm">Sign Out</span>
           </button>
@@ -463,6 +466,12 @@ export default function Home() {
                     <span className="text-sm text-gray-700 dark:text-gray-300">Profile</span>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
                   </div>
+                  {session?.user.role === 'OWNER' && (
+                    <Link href="/settings/user-access" className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">User Access</span>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </Link>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-700 dark:text-gray-300">Change PIN</span>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
@@ -531,7 +540,7 @@ export default function Home() {
               </div>
 
               {/* Sign Out */}
-              <button className="w-full py-3 bg-red-50 dark:bg-red-900/10 text-red-500 font-medium text-sm rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors">
+              <button onClick={() => void signOut({ callbackUrl: '/signin' })} className="w-full py-3 bg-red-50 dark:bg-red-900/10 text-red-500 font-medium text-sm rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors">
                 Sign Out
               </button>
             </div>

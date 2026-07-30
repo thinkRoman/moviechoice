@@ -5,6 +5,9 @@ import VerificationCode from '@/models/VerificationCode';
 import { verifyOtp, MAX_ATTEMPTS } from '@/lib/otp';
 
 export async function POST(req: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
   // Check if already authenticated
   const session = await auth();
   if (session?.user?.id) {

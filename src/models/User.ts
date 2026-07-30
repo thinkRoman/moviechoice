@@ -1,4 +1,5 @@
 import { Schema, model, models } from 'mongoose';
+import type { UserRole, UserStatus } from '@/lib/access';
 
 export interface IUser {
   _id: string;
@@ -8,6 +9,12 @@ export interface IUser {
   phone: string;
   phoneVerified: Date | null;
   image: string | null;
+  pinHash?: string;
+  pinSalt?: string;
+  role: UserRole;
+  status: UserStatus;
+  monthlyAiLimitUsd?: number;
+  lastLoginAt: Date | null;
   providers: {
     google?: {
       providerAccountId: string;
@@ -23,11 +30,17 @@ export interface IUser {
 const UserSchema = new Schema<IUser>(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, sparse: true, index: true },
+    email: { type: String, required: true, trim: true, lowercase: true, unique: true, index: true },
     emailVerified: { type: Date, default: null },
     phone: { type: String, required: false, sparse: true, index: true },
     phoneVerified: { type: Date, default: null },
     image: { type: String, default: null },
+    pinHash: { type: String, select: false },
+    pinSalt: { type: String, select: false },
+    role: { type: String, enum: ['OWNER', 'MEMBER'], default: 'MEMBER', required: true },
+    status: { type: String, enum: ['ACTIVE', 'SUSPENDED'], default: 'ACTIVE', required: true },
+    monthlyAiLimitUsd: { type: Number, min: 0 },
+    lastLoginAt: { type: Date, default: null },
     providers: {
       google: {
         providerAccountId: { type: String, sparse: true, index: true },
