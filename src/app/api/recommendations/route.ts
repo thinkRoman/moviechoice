@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const body = await request.json().catch(() => ({}));
-  const overrides = sessionOverridesSchema.safeParse(body.overrides);
+  const overrides = sessionOverridesSchema.safeParse(body.overrides ?? {});
   if (!overrides.success) {
     return NextResponse.json({ error: overrides.error.issues[0]?.message || 'Invalid session preferences' }, { status: 400 });
   }
