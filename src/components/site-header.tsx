@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Search, Sparkles } from 'lucide-react';
+import { Search, Settings, Sparkles } from 'lucide-react';
 
 export default function SiteHeader() {
   return (
@@ -13,6 +13,9 @@ export default function SiteHeader() {
         </Link>
         <Link href="/for-you" className="hidden shrink-0 items-center gap-1.5 text-sm font-semibold text-violet-300 transition hover:text-white sm:flex">
           <Sparkles className="h-3.5 w-3.5" /> For You
+        </Link>
+        <Link href="/settings" aria-label="Personalization settings" className="hidden shrink-0 text-zinc-400 transition hover:text-white sm:block">
+          <Settings className="h-4 w-4" />
         </Link>
         <form action="/search" className="relative ml-auto w-full max-w-sm">
           <label htmlFor="global-movie-search" className="sr-only">Search movies</label>

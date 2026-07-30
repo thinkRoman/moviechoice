@@ -5,10 +5,9 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
-  CalendarClock,
-  Check,
   LoaderCircle,
   RotateCw,
+  Settings,
   Share2,
   Sparkles,
   WandSparkles,
@@ -16,7 +15,6 @@ import {
 import LibraryActions from '@/components/library-actions';
 import {
   DEFAULT_PICK_SETTINGS,
-  PICK_GENRES,
   STREAMING_SERVICES,
   type PickSettings,
   type RecommendedTitle,
@@ -26,55 +24,6 @@ interface PicksResponse {
   settings: PickSettings;
   items: RecommendedTitle[];
   generatedAt: string;
-}
-
-function ToggleChip({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: React.ReactNode;
-  onClick(): void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-        active
-          ? 'border-violet-400/60 bg-violet-500/20 text-violet-100'
-          : 'border-white/10 bg-white/[0.035] text-zinc-400 hover:border-white/20 hover:text-white'
-      }`}
-    >
-      {active ? <Check className="mr-1.5 inline h-3.5 w-3.5" /> : null}
-      {children}
-    </button>
-  );
-}
-
-function CountControl({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange(value: number): void;
-}) {
-  return (
-    <label className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-      <span className="block text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-2 w-full bg-transparent text-lg font-bold text-white outline-none"
-      >
-        {[0, 1, 2, 3, 4, 5].map((count) => <option key={count} className="bg-zinc-900">{count}</option>)}
-      </select>
-    </label>
-  );
 }
 
 function PickCard({ item, featured = false }: { item: RecommendedTitle; featured?: boolean }) {
@@ -127,6 +76,8 @@ export default function RecommendationStudio() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [spotlight, setSpotlight] = useState(0);
+  const [showOverride, setShowOverride] = useState(false);
+  const [sessionNote, setSessionNote] = useState('');
 
   useEffect(() => {
     fetch('/api/recommendations', { cache: 'no-store' })
@@ -135,18 +86,9 @@ export default function RecommendationStudio() {
         const body = await response.json() as { settings: PickSettings };
         setSettings(body.settings);
       })
-      .catch(() => setError('Your preferences could not be loaded. You can still choose them below.'))
+      .catch(() => setError('Your saved settings could not be loaded. Please try again.'))
       .finally(() => setLoading(false));
   }, []);
-
-  function toggleList(key: 'providerIds' | 'genreIds', value: number) {
-    setSettings((current) => ({
-      ...current,
-      [key]: current[key].includes(value)
-        ? current[key].filter((item) => item !== value)
-        : [...current[key], value],
-    }));
-  }
 
   async function createPicks() {
     setCreating(true);
@@ -155,7 +97,9 @@ export default function RecommendationStudio() {
       const response = await fetch('/api/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(sessionNote.trim()
+          ? { overrides: { tasteNote: [settings.tasteNote, sessionNote.trim()].filter(Boolean).join(' Session request: ') } }
+          : {}),
       });
       const body = await response.json() as PicksResponse & { error?: string };
       if (!response.ok) throw new Error(body.error || 'MovieChoice could not create your picks.');
@@ -196,66 +140,48 @@ export default function RecommendationStudio() {
             What should I watch?
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-400">
-            Tell MovieChoice what tonight feels like. We’ll narrow the catalog to a small set worth your time.
+            One tap. A considered shortlist shaped by the preferences you’ve already saved.
           </p>
 
-          <div className="mt-10 space-y-8 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 shadow-2xl shadow-violet-950/10 backdrop-blur sm:p-8">
-            <fieldset>
-              <legend className="text-sm font-bold text-white">Where can you watch?</legend>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {STREAMING_SERVICES.map((service) => (
-                  <ToggleChip key={service.id} active={settings.providerIds.includes(service.id)} onClick={() => toggleList('providerIds', service.id)}>
-                    {service.name}
-                  </ToggleChip>
-                ))}
+          <div className="mt-10 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 shadow-2xl shadow-violet-950/10 backdrop-blur sm:p-8">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-bold text-white">Ready with your saved settings</p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  {settings.movieCount} movies · {settings.showCount} shows · {settings.documentaryCount} docs · last {settings.yearsBack} years
+                </p>
+                <p className="mt-1 text-xs text-zinc-600">
+                  {STREAMING_SERVICES.filter((service) => settings.providerIds.includes(service.id)).map((service) => service.name).join(', ')}
+                </p>
               </div>
-            </fieldset>
-            <fieldset>
-              <legend className="text-sm font-bold text-white">What feels right?</legend>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {PICK_GENRES.map((genre) => (
-                  <ToggleChip key={genre.id} active={settings.genreIds.includes(genre.id)} onClick={() => toggleList('genreIds', genre.id)}>
-                    {genre.name}
-                  </ToggleChip>
-                ))}
-              </div>
-            </fieldset>
-            <label className="block">
-              <span className="text-sm font-bold text-white">A little guidance <span className="font-normal text-zinc-600">(optional)</span></span>
-              <textarea
-                value={settings.tasteNote}
-                maxLength={240}
-                onChange={(event) => setSettings((current) => ({ ...current, tasteNote: event.target.value }))}
-                placeholder="Smart, tense, not too bleak. Something we can finish tonight."
-                className="mt-3 min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/20"
-              />
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              <CountControl label="Movies" value={settings.movieCount} onChange={(movieCount) => setSettings((current) => ({ ...current, movieCount }))} />
-              <CountControl label="Shows" value={settings.showCount} onChange={(showCount) => setSettings((current) => ({ ...current, showCount }))} />
-              <CountControl label="Docs" value={settings.documentaryCount} onChange={(documentaryCount) => setSettings((current) => ({ ...current, documentaryCount }))} />
-            </div>
-            <div className="flex flex-col gap-4 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <label className="flex cursor-pointer items-center gap-3 text-sm text-zinc-300">
-                <input
-                  type="checkbox"
-                  checked={settings.weeklyRefresh}
-                  onChange={(event) => setSettings((current) => ({ ...current, weeklyRefresh: event.target.checked }))}
-                  className="h-5 w-5 accent-violet-500"
-                />
-                <CalendarClock className="h-4 w-4 text-violet-300" />
-                Make these my Friday settings
-              </label>
               <button
                 type="button"
                 onClick={createPicks}
                 disabled={creating || loading || settings.providerIds.length === 0}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-black text-zinc-950 shadow-xl transition hover:-translate-y-0.5 hover:bg-violet-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-base font-black text-zinc-950 shadow-xl transition hover:-translate-y-0.5 hover:bg-violet-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
-                {creating ? 'Finding the right ones…' : 'Create my picks'}
+                {creating ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <WandSparkles className="h-5 w-5" />}
+                {creating ? 'Finding the right ones…' : 'Recommend Now'}
               </button>
             </div>
+            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-white/10 pt-5 text-sm">
+              <button type="button" onClick={() => setShowOverride((current) => !current)} className="font-semibold text-violet-300 hover:text-white">
+                {showOverride ? 'Remove one-time request' : 'Something different tonight?'}
+              </button>
+              <Link href="/settings" className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-white">
+                <Settings className="h-4 w-4" /> Edit saved settings
+              </Link>
+            </div>
+            {showOverride ? <label className="mt-5 block">
+              <span className="text-sm font-bold text-white">One-time request <span className="font-normal text-zinc-600">(not saved)</span></span>
+              <textarea
+                value={sessionNote}
+                maxLength={240}
+                onChange={(event) => setSessionNote(event.target.value)}
+                placeholder="I’m watching with the family, only comedies tonight, surprise me…"
+                className="mt-3 min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/20"
+              />
+            </label> : null}
             {error ? <p role="alert" className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">{error}</p> : null}
           </div>
         </div>
