@@ -31,8 +31,8 @@ function PickCard({ item, featured = false }: { item: RecommendedTitle; featured
     ? `/movies/${item.id}`
     : `https://www.themoviedb.org/tv/${item.id}`;
   return (
-    <article className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 ${featured ? 'md:col-span-2' : ''}`}>
-      <div className={`relative overflow-hidden ${featured ? 'aspect-[16/10] sm:aspect-[16/8]' : 'aspect-[2/3]'}`}>
+    <article className={`group relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#111016] shadow-xl shadow-black/20 ${featured ? 'md:col-span-2' : ''}`}>
+      <div className={`relative hidden overflow-hidden sm:block ${featured ? 'aspect-[16/10] sm:aspect-[16/8]' : 'aspect-[2/3]'}`}>
         {featured && item.backdropUrl ? (
           <Image src={item.backdropUrl} alt="" fill sizes="(max-width: 768px) 100vw, 66vw" className="object-cover transition duration-700 group-hover:scale-[1.03]" />
         ) : item.posterUrl ? (
@@ -64,7 +64,34 @@ function PickCard({ item, featured = false }: { item: RecommendedTitle; featured
           </Link>
         </div>
       </div>
-      {!featured ? <p className="p-4 text-sm leading-6 text-zinc-400">{item.reason}</p> : null}
+      <div className="p-4 sm:hidden">
+        <div className="flex gap-4">
+          <div className="relative aspect-[2/3] w-[108px] shrink-0 overflow-hidden rounded-2xl bg-zinc-900 shadow-lg">
+            {item.posterUrl ? <Image src={item.posterUrl} alt={`${item.title} poster`} fill sizes="108px" className="object-cover" /> : null}
+          </div>
+          <div className="min-w-0 flex-1 py-1">
+            <p className="text-[11px] font-black uppercase tracking-[0.1em] text-violet-400">{item.providerNames[0] || item.kind} · {item.year}</p>
+            <h3 className="mt-1 font-serif text-[1.35rem] font-bold leading-tight text-white">{item.title}</h3>
+            <p className="mt-2 text-sm font-bold text-amber-400">★ <span className="text-white">{item.rating.toFixed(1)}</span></p>
+            <span className="mt-3 inline-flex rounded-full bg-violet-500/10 px-3 py-1 text-xs font-semibold capitalize text-violet-300">{item.kind}</span>
+          </div>
+        </div>
+        <p className="mt-4 text-[15px] leading-6 text-zinc-400">{item.reason}</p>
+        <div className="mt-4 grid grid-cols-[1fr_auto] gap-2 border-t border-white/10 pt-4">
+          <div className="min-w-0">
+            {item.mediaType === 'movie' ? (
+              <LibraryActions
+                card
+                movie={{ tmdbMovieId: item.id, title: item.title, posterPath: item.posterPath, releaseYear: item.year }}
+              />
+            ) : <span className="flex h-11 items-center px-4 text-sm font-semibold text-zinc-500">Show</span>}
+          </div>
+          <Link href={href} target={item.mediaType === 'tv' ? '_blank' : undefined} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl bg-violet-500 px-4 text-sm font-bold text-white">
+            Details <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+      {!featured ? <p className="hidden p-4 text-sm leading-6 text-zinc-400 sm:block">{item.reason}</p> : null}
     </article>
   );
 }
@@ -130,20 +157,20 @@ export default function RecommendationStudio() {
 
   return (
     <>
-      <section className="relative border-b border-white/10 px-4 pb-12 pt-28 sm:px-6 sm:pb-16">
+      <section className="relative border-b border-white/10 px-4 pb-10 pt-24 sm:px-6 sm:pb-16 sm:pt-28">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(139,92,246,0.20),transparent_38%)]" />
         <div className="relative mx-auto max-w-5xl">
           <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.25em] text-violet-300">
             <Sparkles className="h-4 w-4" /> Chosen around you
           </p>
-          <h1 className="mt-4 max-w-3xl text-4xl font-black leading-[0.96] tracking-[-0.045em] sm:text-6xl">
+          <h1 className="mt-3 max-w-3xl font-serif text-4xl font-bold leading-[1.02] tracking-[-0.035em] sm:mt-4 sm:text-6xl sm:font-black">
             What should I watch?
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-400">
             One tap. A considered shortlist shaped by the preferences you’ve already saved.
           </p>
 
-          <div className="mt-10 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 shadow-2xl shadow-violet-950/10 backdrop-blur sm:p-8">
+          <div className="mt-7 rounded-[1.75rem] border border-white/10 bg-white/[0.045] p-5 shadow-2xl shadow-violet-950/10 backdrop-blur sm:mt-10 sm:rounded-[2rem] sm:p-8">
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-bold text-white">Ready with your saved settings</p>
@@ -187,7 +214,7 @@ export default function RecommendationStudio() {
         </div>
       </section>
 
-      <section id="your-picks" className="mx-auto max-w-5xl scroll-mt-20 px-4 py-14 sm:px-6 sm:py-20">
+      <section id="your-picks" className="mx-auto max-w-5xl scroll-mt-20 px-4 pb-28 pt-10 sm:px-6 sm:py-20">
         {ordered.length ? (
           <>
             <div className="flex items-end justify-between gap-4">
@@ -204,7 +231,7 @@ export default function RecommendationStudio() {
                 </button>
               </div>
             </div>
-            <div className="mt-7 grid grid-cols-2 gap-4 md:grid-cols-3">
+            <div className="mt-6 grid grid-cols-1 gap-5 sm:mt-7 sm:grid-cols-2 sm:gap-4 md:grid-cols-3">
               {ordered.map((item, index) => <PickCard key={`${item.mediaType}-${item.id}`} item={item} featured={index === 0} />)}
             </div>
           </>

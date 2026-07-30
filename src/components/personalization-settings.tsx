@@ -99,11 +99,11 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
   }
 
   return (
-    <section className="mx-auto max-w-4xl px-4 pb-24 pt-28 sm:px-6">
+    <section className="mx-auto max-w-4xl px-4 pb-32 pt-24 sm:px-6 sm:pb-24 sm:pt-28">
       <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.25em] text-violet-300">
         <Sparkles className="h-4 w-4" /> Your MovieChoice
       </p>
-      <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">Settings</h1>
+      <h1 className="mt-3 font-serif text-4xl font-bold tracking-tight sm:mt-4 sm:text-5xl sm:font-black">Settings</h1>
       <p className="mt-3 max-w-2xl leading-7 text-zinc-400">
         Set these once. MovieChoice will remember them whenever you tap Recommend Now.
       </p>
@@ -164,7 +164,7 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
           />
         </section>
 
-        <div className="sticky bottom-4 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-zinc-950/90 p-3 shadow-2xl backdrop-blur sm:flex-row sm:items-center">
+        <div className="sticky bottom-20 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-zinc-950/90 p-3 shadow-2xl backdrop-blur sm:bottom-4 sm:flex-row sm:items-center">
           <button type="button" onClick={save} disabled={saving || settings.providerIds.length === 0} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-violet-500 px-6 font-black hover:bg-violet-400 disabled:opacity-50">
             {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? 'Saving…' : 'Save settings'}

@@ -7,9 +7,11 @@ import type { LibraryAction, LibraryMovieInput } from '@/lib/movie-library';
 export default function LibraryActions({
   movie,
   compact = false,
+  card = false,
 }: {
   movie: LibraryMovieInput;
   compact?: boolean;
+  card?: boolean;
 }) {
   const { authenticated, itemFor, pendingKey, toggle } = useLibrary();
   if (!authenticated) return null;
@@ -45,6 +47,28 @@ export default function LibraryActions({
       >
         <Icon className="h-4 w-4" />
       </button>
+    );
+  }
+
+  if (card) {
+    return (
+      <div className="grid grid-cols-3 gap-2">
+        {actions.map(({ action, active, label, activeLabel, icon: Icon }) => (
+          <button
+            key={action}
+            type="button"
+            aria-label={active ? activeLabel : label}
+            aria-pressed={active}
+            disabled={pendingKey === `${movie.tmdbMovieId}:${action}`}
+            onClick={() => void toggle(movie, action)}
+            className={`flex h-11 items-center justify-center rounded-xl transition disabled:opacity-50 ${
+              active ? 'bg-violet-500 text-white' : 'bg-white/5 text-zinc-300 active:bg-white/10'
+            }`}
+          >
+            <Icon className={`h-4 w-4 ${action === 'favorite' && active ? 'fill-current' : ''}`} />
+          </button>
+        ))}
+      </div>
     );
   }
 
