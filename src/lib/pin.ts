@@ -1,4 +1,4 @@
-import { randomInt, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
+import { createHash, randomInt, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 
 const SCRYPT_OPTIONS = { N: 32768, r: 8, p: 1, maxmem: 128 * 1024 * 1024 };
 
@@ -23,7 +23,7 @@ export function verifyPin(pin: string, pinHash: string, pinSalt: string): boolea
 }
 
 export function secureStringEqual(value: string, expected: string): boolean {
-  const valueDigest = scryptSync(value, 'moviechoice-owner-pin', 64, SCRYPT_OPTIONS);
-  const expectedDigest = scryptSync(expected, 'moviechoice-owner-pin', 64, SCRYPT_OPTIONS);
+  const valueDigest = createHash('sha256').update(value).digest();
+  const expectedDigest = createHash('sha256').update(expected).digest();
   return timingSafeEqual(valueDigest, expectedDigest);
 }

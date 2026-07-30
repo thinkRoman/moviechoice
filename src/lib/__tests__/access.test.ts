@@ -129,7 +129,7 @@ describe('invite-only email and PIN access', () => {
     ).toBeNull();
   });
 
-  it('member cannot access user-management operations', async () => {
+  it('member cannot access user-management APIs through the shared server guard', async () => {
     await expect(
       createMember('MEMBER', { name: 'Nope', email: 'nope@example.com' }, store.repository, sendInvitation),
     ).rejects.toThrow('FORBIDDEN');
