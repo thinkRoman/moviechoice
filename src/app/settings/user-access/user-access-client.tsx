@@ -69,7 +69,7 @@ export default function UserAccessClient() {
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8 text-gray-900 dark:bg-[#0a0a0a] dark:text-white">
       <div className="mx-auto max-w-2xl">
-        <Link href="/" className="mb-6 inline-flex items-center gap-2 text-sm text-purple-600">
+        <Link href="/settings" className="mb-6 inline-flex items-center gap-2 text-sm text-purple-600">
           <ArrowLeft className="h-4 w-4" /> Settings
         </Link>
         <h1 className="text-3xl font-bold">User Access</h1>

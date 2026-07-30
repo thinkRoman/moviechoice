@@ -1,7 +1,11 @@
 import Link from 'next/link';
-import { Search, Settings, Sparkles } from 'lucide-react';
+import { Search, Settings, Sparkles, UserPlus } from 'lucide-react';
+import { auth } from '@/lib/auth';
 
-export default function SiteHeader() {
+export default async function SiteHeader() {
+  const session = await auth();
+  const isOwner = session?.user?.role === 'OWNER';
+
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[#08090d]/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
@@ -17,6 +21,11 @@ export default function SiteHeader() {
         <Link href="/settings" aria-label="Personalization settings" className="hidden shrink-0 text-zinc-400 transition hover:text-white sm:block">
           <Settings className="h-4 w-4" />
         </Link>
+        {isOwner ? (
+          <Link href="/settings/user-access" className="hidden shrink-0 items-center gap-1.5 text-sm font-semibold text-zinc-300 transition hover:text-white sm:flex">
+            <UserPlus className="h-4 w-4" /> Invite
+          </Link>
+        ) : null}
         <form action="/search" className="relative ml-auto w-full max-w-sm">
           <label htmlFor="global-movie-search" className="sr-only">Search movies</label>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -31,6 +40,11 @@ export default function SiteHeader() {
         <Link href="/for-you" aria-label="Recommendations for you" className="shrink-0 text-violet-300 sm:hidden">
           <Sparkles className="h-5 w-5" />
         </Link>
+        {isOwner ? (
+          <Link href="/settings/user-access" aria-label="Invite and manage users" className="shrink-0 text-zinc-300 sm:hidden">
+            <UserPlus className="h-5 w-5" />
+          </Link>
+        ) : null}
       </div>
     </header>
   );

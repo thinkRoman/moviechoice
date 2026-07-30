@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Check, LoaderCircle, Save, Sparkles } from 'lucide-react';
+import { Check, LoaderCircle, Save, Sparkles, UserPlus } from 'lucide-react';
 import {
   DEFAULT_PICK_SETTINGS,
   PICK_GENRES,
@@ -53,7 +53,7 @@ function Stepper({
   );
 }
 
-export default function PersonalizationSettings() {
+export default function PersonalizationSettings({ isOwner }: { isOwner: boolean }) {
   const [settings, setSettings] = useState<PickSettings>(DEFAULT_PICK_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -109,6 +109,18 @@ export default function PersonalizationSettings() {
       </p>
 
       <div className={`mt-10 space-y-5 transition ${loading ? 'pointer-events-none opacity-50' : ''}`}>
+        {isOwner ? (
+          <Link href="/settings/user-access" className="flex items-center justify-between gap-5 rounded-[2rem] border border-violet-400/25 bg-violet-500/10 p-5 transition hover:border-violet-400/50 hover:bg-violet-500/15 sm:p-7">
+            <div>
+              <h2 className="text-xl font-black">Invite people</h2>
+              <p className="mt-1 text-sm text-zinc-400">Send access PINs and manage who can use MovieChoice.</p>
+            </div>
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-violet-500 text-white">
+              <UserPlus className="h-5 w-5" />
+            </span>
+          </Link>
+        ) : null}
+
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
           <h2 className="text-xl font-black">Weekly mix</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">

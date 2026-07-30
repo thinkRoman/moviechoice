@@ -12,7 +12,7 @@ export default async function SettingsPage() {
   return (
     <main className="min-h-screen bg-[#08090d] text-white">
       <SiteHeader />
-      <PersonalizationSettings />
+      <PersonalizationSettings isOwner={session.user.role === 'OWNER'} />
     </main>
   );
 }
