@@ -9,6 +9,17 @@ export interface IProfile {
   preferences: {
     genres: string[];
     streamingServices: string[];
+    recommendation?: {
+      providerIds: number[];
+      genreIds: number[];
+      tasteNote: string;
+      yearsBack: number;
+      movieCount: number;
+      showCount: number;
+      documentaryCount: number;
+      includeInternational: boolean;
+      weeklyRefresh: boolean;
+    };
   };
   tasteSignals: {
     thumbsUp: number[];
@@ -29,6 +40,17 @@ const ProfileSchema = new Schema<IProfile>(
     preferences: {
       genres: [{ type: String }],
       streamingServices: [{ type: String }],
+      recommendation: {
+        providerIds: [{ type: Number }],
+        genreIds: [{ type: Number }],
+        tasteNote: { type: String, default: '' },
+        yearsBack: { type: Number, default: 5 },
+        movieCount: { type: Number, default: 3 },
+        showCount: { type: Number, default: 2 },
+        documentaryCount: { type: Number, default: 1 },
+        includeInternational: { type: Boolean, default: true },
+        weeklyRefresh: { type: Boolean, default: false },
+      },
     },
     tasteSignals: {
       thumbsUp: [{ type: Number }],
@@ -41,8 +63,5 @@ const ProfileSchema = new Schema<IProfile>(
   },
   { timestamps: true }
 );
-
-// Unique index on userId to prevent duplicate profiles
-ProfileSchema.index({ userId: 1 }, { unique: true });
 
 export default models.Profile || model<IProfile>('Profile', ProfileSchema);

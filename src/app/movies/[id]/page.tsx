@@ -4,6 +4,7 @@ import { ArrowLeft, Clock3, Play, Star } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import SiteHeader from '@/components/site-header';
 import { getMovieDetails } from '@/lib/tmdb';
+import LibraryActions from '@/components/library-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +67,14 @@ export default async function MovieDetailsPage({
                   <Play className="h-4 w-4 fill-current" /> Watch trailer
                 </a>
               ) : null}
+              <LibraryActions
+                movie={{
+                  tmdbMovieId: movie.id,
+                  title: movie.title,
+                  posterPath: movie.posterPath,
+                  releaseYear: movie.year,
+                }}
+              />
             </div>
           </div>
         </div>

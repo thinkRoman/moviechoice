@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Sparkles, Star } from 'lucide-react';
 import type { MovieSummary } from '@/lib/tmdb';
 
 export default function FeaturedHero({ movie }: { movie: MovieSummary }) {
@@ -37,12 +37,20 @@ export default function FeaturedHero({ movie }: { movie: MovieSummary }) {
           <p className="animation-delay-150 animate-rise-in mt-5 line-clamp-3 max-w-xl text-sm leading-6 text-zinc-300 sm:text-base sm:leading-7">
             {movie.overview || 'Discover the movie everyone is talking about this week.'}
           </p>
-          <Link
-            href={`/movies/${movie.id}`}
-            className="animation-delay-300 animate-rise-in mt-7 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-zinc-950 shadow-xl shadow-black/20 transition hover:-translate-y-0.5 hover:bg-violet-200 hover:shadow-violet-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-          >
-            View movie <ArrowRight className="h-4 w-4" />
-          </Link>
+          <div className="animation-delay-300 animate-rise-in mt-7 flex flex-wrap gap-3">
+            <Link
+              href="/for-you"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-zinc-950 shadow-xl shadow-black/20 transition hover:-translate-y-0.5 hover:bg-violet-200 hover:shadow-violet-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            >
+              <Sparkles className="h-4 w-4" /> Pick for me
+            </Link>
+            <Link
+              href={`/movies/${movie.id}`}
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/20 px-6 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white/10"
+            >
+              View movie <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </div>
     </section>

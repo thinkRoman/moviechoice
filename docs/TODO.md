@@ -75,7 +75,7 @@ NEXTAUTH_SECRET=generate-a-random-32-char-string-here
 NEXTAUTH_URL=http://localhost:3000
 
 # TMDB
-TMDB_API_KEY=your-tmdb-api-key-here
+TMDB_API_READ_ACCESS_TOKEN=your-tmdb-read-access-token-here
 TMDB_BASE_URL=https://api.themoviedb.org/3
 
 # OpenAI

@@ -21,9 +21,23 @@ interface TmdbMovie {
   runtime?: number | null;
 }
 
-interface TmdbListResponse {
+interface TmdbTv {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  first_air_date?: string;
+  vote_average: number;
+  vote_count: number;
+  popularity: number;
+  genre_ids?: number[];
+  origin_country?: string[];
+}
+
+interface TmdbListResponse<T = TmdbMovie> {
   page: number;
-  results: TmdbMovie[];
+  results: T[];
   total_pages: number;
   total_results: number;
 }
@@ -61,6 +75,7 @@ export interface MovieSummary {
   title: string;
   overview: string;
   posterUrl: string | null;
+  posterPath: string | null;
   backdropUrl: string | null;
   releaseDate: string | null;
   year: string | null;
@@ -98,6 +113,7 @@ function toMovieSummary(movie: TmdbMovie): MovieSummary {
     title: movie.title,
     overview: movie.overview,
     posterUrl: imageUrl(movie.poster_path, 'w500'),
+    posterPath: movie.poster_path,
     backdropUrl: imageUrl(movie.backdrop_path, 'original'),
     releaseDate: movie.release_date || null,
     year: movie.release_date?.slice(0, 4) || null,
@@ -134,6 +150,72 @@ async function tmdbFetch<T>(
   }
 
   return response.json() as Promise<T>;
+}
+
+export interface DiscoverTitle {
+  id: number;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  overview: string;
+  posterUrl: string | null;
+  posterPath: string | null;
+  backdropUrl: string | null;
+  releaseDate: string | null;
+  year: string | null;
+  rating: number;
+  voteCount: number;
+  popularity: number;
+  genreIds: number[];
+  international: boolean;
+}
+
+function toDiscoverTitle(item: TmdbMovie | TmdbTv, mediaType: 'movie' | 'tv'): DiscoverTitle {
+  const isMovie = mediaType === 'movie';
+  const movie = item as TmdbMovie;
+  const tv = item as TmdbTv;
+  const releaseDate = isMovie ? movie.release_date || null : tv.first_air_date || null;
+  return {
+    id: item.id,
+    mediaType,
+    title: isMovie ? movie.title : tv.name,
+    overview: item.overview,
+    posterUrl: imageUrl(item.poster_path, 'w500'),
+    posterPath: item.poster_path,
+    backdropUrl: imageUrl(item.backdrop_path, 'original'),
+    releaseDate,
+    year: releaseDate?.slice(0, 4) || null,
+    rating: item.vote_average,
+    voteCount: item.vote_count,
+    popularity: item.popularity,
+    genreIds: item.genre_ids || [],
+    international: mediaType === 'tv'
+      ? Boolean(tv.origin_country?.length && !tv.origin_country.includes('US'))
+      : false,
+  };
+}
+
+export async function discoverTitles(
+  mediaType: 'movie' | 'tv',
+  params: Record<string, string>,
+  page = 1,
+): Promise<DiscoverTitle[]> {
+  const data = await tmdbFetch<TmdbListResponse<TmdbMovie | TmdbTv>>(
+    `/discover/${mediaType}`,
+    {
+      include_adult: 'false',
+      include_video: 'false',
+      language: 'en-US',
+      page: String(page),
+      sort_by: 'vote_average.desc',
+      watch_region: 'US',
+      with_watch_monetization_types: 'flatrate',
+      ...params,
+    },
+    1800,
+  );
+  return data.results
+    .filter((title) => title.poster_path && title.overview)
+    .map((title) => toDiscoverTitle(title, mediaType));
 }
 
 async function movieList(path: string): Promise<MovieSummary[]> {

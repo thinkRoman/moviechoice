@@ -79,7 +79,7 @@ NEXTAUTH_SECRET=<generate-random-secret>
 NEXTAUTH_URL=http://localhost:3000
 
 # TMDB
-TMDB_API_KEY=<your-tmdb-api-key>
+TMDB_API_READ_ACCESS_TOKEN=<your-tmdb-read-access-token>
 TMDB_BASE_URL=https://api.themoviedb.org/3
 
 # OpenAI
@@ -221,7 +221,7 @@ moviechoice/
 | `NEXTAUTH_URL` | `https://moviechoice.vercel.app` |
 | `MONGODB_URI` | Production MongoDB connection string |
 | `NEXTAUTH_SECRET` | Production random secret |
-| `TMDB_API_KEY` | Production TMDB API key |
+| `TMDB_API_READ_ACCESS_TOKEN` | Production TMDB API Read Access Token (Bearer authentication) |
 | `OPENAI_API_KEY` | Production OpenAI API key |
 | `GOOGLE_CLIENT_ID` | Production Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Production Google OAuth client secret |

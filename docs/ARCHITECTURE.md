@@ -334,7 +334,7 @@ Confirmation returned to client
 
 | Variable | Purpose | Required |
 |----------|---------|----------|
-| `TMDB_API_KEY` | TMDB API access | Yes |
+| `TMDB_API_READ_ACCESS_TOKEN` | TMDB API Read Access Token (Bearer authentication) | Yes |
 | `OPENAI_API_KEY` | OpenAI API access | Yes |
 | `MONGODB_URI` | MongoDB connection string | Yes |
 | `NEXTAUTH_SECRET` | NextAuth encryption key | Yes |
