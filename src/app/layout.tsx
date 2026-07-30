@@ -10,9 +10,12 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'MovieChoice — What should we watch tonight?',
+  title: {
+    default: 'MovieChoice — Discover your next great movie',
+    template: '%s — MovieChoice',
+  },
   description:
-    'Eliminate streaming decision fatigue with personalized recommendations in seconds.',
+    'Discover trending, popular, top-rated, and upcoming movies.',
   manifest: '/manifest.json',
 };
 
