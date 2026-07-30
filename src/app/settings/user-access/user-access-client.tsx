@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, RefreshCw, UserPlus } from 'lucide-react';
 import type { SafeAccessUser } from '@/lib/access';
@@ -12,14 +12,18 @@ export default function UserAccessClient() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const loadUsers = useCallback(async () => {
+  async function loadUsers() {
     const response = await fetch('/api/settings/user-access', { cache: 'no-store' });
     if (response.ok) setUsers((await response.json()).users);
-  }, []);
+  }
 
   useEffect(() => {
-    void loadUsers();
-  }, [loadUsers]);
+    fetch('/api/settings/user-access', { cache: 'no-store' })
+      .then(async (response) => {
+        if (response.ok) setUsers((await response.json()).users);
+      })
+      .catch(() => setMessage('Could not load users.'));
+  }, []);
 
   async function addUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
