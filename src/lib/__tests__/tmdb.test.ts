@@ -24,7 +24,7 @@ describe('TMDB server integration', () => {
   });
 
   it('loads all home collections in parallel with Bearer authentication', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
+    const fetchMock = vi.fn().mockImplementation(async () =>
       new Response(JSON.stringify({ page: 1, results: [movie], total_pages: 1, total_results: 1 })),
     );
     vi.stubGlobal('fetch', fetchMock);
