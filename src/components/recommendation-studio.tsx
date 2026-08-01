@@ -39,17 +39,16 @@ function PickCard({ item, featured = false }: { item: RecommendedTitle; featured
           <Image src={item.posterUrl} alt={`${item.title} poster`} fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover transition duration-700 group-hover:scale-[1.03]" />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
-        {item.mediaType === 'movie' ? (
-          <LibraryActions
-            compact
-            movie={{
-              tmdbMovieId: item.id,
-              title: item.title,
-              posterPath: item.posterPath,
-              releaseYear: item.year,
-            }}
-          />
-        ) : null}
+        <LibraryActions
+          compact
+          movie={{
+            tmdbMovieId: item.id,
+            mediaType: item.mediaType,
+            title: item.title,
+            posterPath: item.posterPath,
+            releaseYear: item.year,
+          }}
+        />
         <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
           <div className="mb-2 flex items-center gap-2">
             <span className="rounded-full bg-violet-400 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-violet-950">
@@ -79,12 +78,10 @@ function PickCard({ item, featured = false }: { item: RecommendedTitle; featured
         <p className="mt-4 text-[15px] leading-6 text-zinc-400">{item.reason}</p>
         <div className="mt-4 grid grid-cols-[1fr_auto] gap-2 border-t border-white/10 pt-4">
           <div className="min-w-0">
-            {item.mediaType === 'movie' ? (
-              <LibraryActions
-                card
-                movie={{ tmdbMovieId: item.id, title: item.title, posterPath: item.posterPath, releaseYear: item.year }}
-              />
-            ) : <span className="flex h-11 items-center px-4 text-sm font-semibold text-zinc-500">Show</span>}
+            <LibraryActions
+              card
+              movie={{ tmdbMovieId: item.id, mediaType: item.mediaType, title: item.title, posterPath: item.posterPath, releaseYear: item.year }}
+            />
           </div>
           <Link href={href} target={item.mediaType === 'tv' ? '_blank' : undefined} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl bg-violet-500 px-4 text-sm font-bold text-white">
             Details <ArrowRight className="h-4 w-4" />
@@ -124,9 +121,10 @@ export default function RecommendationStudio() {
       const response = await fetch('/api/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sessionNote.trim()
-          ? { overrides: { tasteNote: [settings.tasteNote, sessionNote.trim()].filter(Boolean).join(' Session request: ') } }
-          : {}),
+        body: JSON.stringify({
+          sessionRequest: sessionNote.trim(),
+          refreshToken: crypto.randomUUID(),
+        }),
       });
       const body = await response.json() as PicksResponse & { error?: string };
       if (!response.ok) throw new Error(body.error || 'MovieChoice could not create your picks.');

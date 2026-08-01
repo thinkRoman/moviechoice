@@ -51,6 +51,7 @@ describe('My Movies API authorization', () => {
         title: 'Inception',
         posterPath: '/poster.jpg',
         releaseYear: '2010',
+        mediaType: 'movie',
       }),
     });
     const response = await PUT(request, {
@@ -73,6 +74,7 @@ describe('My Movies API authorization', () => {
       title: 'Inception',
       posterPath: '/poster.jpg',
       releaseYear: '2010',
+      mediaType: 'movie',
       inWatchlist: false,
       watched: false,
       favorite: false,
@@ -89,6 +91,7 @@ describe('My Movies API authorization', () => {
         title: 'Inception',
         posterPath: '/poster.jpg',
         releaseYear: '2010',
+        mediaType: 'movie',
       }),
     });
     const response = await PUT(request, {

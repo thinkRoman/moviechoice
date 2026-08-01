@@ -19,6 +19,7 @@ interface TmdbMovie {
   genre_ids?: number[];
   genres?: TmdbGenre[];
   runtime?: number | null;
+  original_language?: string;
 }
 
 interface TmdbTv {
@@ -33,6 +34,7 @@ interface TmdbTv {
   popularity: number;
   genre_ids?: number[];
   origin_country?: string[];
+  original_language?: string;
 }
 
 interface TmdbListResponse<T = TmdbMovie> {
@@ -188,7 +190,7 @@ function toDiscoverTitle(item: TmdbMovie | TmdbTv, mediaType: 'movie' | 'tv'): D
     voteCount: item.vote_count,
     popularity: item.popularity,
     genreIds: item.genre_ids || [],
-    international: mediaType === 'tv'
+    international: item.original_language ? item.original_language !== 'en' : mediaType === 'tv'
       ? Boolean(tv.origin_country?.length && !tv.origin_country.includes('US'))
       : false,
   };

@@ -42,6 +42,16 @@ export interface RecommendedTitle extends DiscoverTitle {
   score: number;
 }
 
+export interface SessionIntent {
+  genreIds: number[];
+  excludedGenreIds: number[];
+  maxRuntime?: number;
+  surpriseMe: boolean;
+  familyFriendly: boolean;
+  preferInternational: boolean;
+  keywords: string[];
+}
+
 export const DEFAULT_PICK_SETTINGS: PickSettings = {
   providerIds: [8, 9],
   genreIds: [18, 53],
@@ -60,15 +70,85 @@ function stableVariety(id: number, seed: string): number {
   return (Math.abs(hash) % 1000) / 1000;
 }
 
-function titleScore(title: DiscoverTitle, minimumRating: number, seed: string): number {
+const GENRE_TERMS: Array<{ id: number; terms: RegExp }> = [
+  { id: 28, terms: /\b(action|adventure|exciting)\b/i },
+  { id: 35, terms: /\b(comedy|comedies|funny|laugh|lighthearted)\b/i },
+  { id: 18, terms: /\b(drama|dramatic|emotional)\b/i },
+  { id: 27, terms: /\b(horror|scary|frightening)\b/i },
+  { id: 9648, terms: /\b(mystery|mysteries|whodunnit)\b/i },
+  { id: 10749, terms: /\b(romance|romantic|date night)\b/i },
+  { id: 878, terms: /\b(sci[ -]?fi|science fiction|futuristic)\b/i },
+  { id: 53, terms: /\b(thriller|suspense|tense)\b/i },
+  { id: 99, terms: /\b(documentary|documentaries|nonfiction)\b/i },
+];
+
+const STOP_WORDS = new Set([
+  'about', 'after', 'again', 'also', 'and', 'can', 'for', 'from', 'have', 'into',
+  'only', 'something', 'that', 'the', 'this', 'tonight', 'want', 'watch', 'with',
+]);
+
+export function interpretSessionRequest(request: string): SessionIntent {
+  const excludedGenreIds = GENRE_TERMS
+    .filter(({ terms }) => new RegExp(`\\b(?:no|not|avoid|without)\\s+(?:${terms.source.replace(/^\\b|\\b\/?[a-z]*$/g, '')})`, 'i').test(request))
+    .map(({ id }) => id);
+  const genreIds = GENRE_TERMS
+    .filter(({ id, terms }) => !excludedGenreIds.includes(id) && terms.test(request))
+    .map(({ id }) => id);
+  const familyFriendly = /\b(family|family-friendly|kids?|children)\b/i.test(request);
+  const maxRuntimeMatch = request.match(/\b(?:under|less than|only have|max(?:imum)?)\s*(\d{2,3})\s*(?:minutes?|mins?)\b/i);
+  const keywords = request.toLowerCase().match(/[a-z][a-z-]+/g)
+    ?.filter((word) => word.length > 3 && !STOP_WORDS.has(word))
+    .slice(0, 12) || [];
+  return {
+    genreIds: familyFriendly ? [...new Set([...genreIds, 10751])] : genreIds,
+    excludedGenreIds: [...new Set([...excludedGenreIds, ...(familyFriendly ? [27] : [])])],
+    ...(maxRuntimeMatch ? { maxRuntime: Number(maxRuntimeMatch[1]) } : {}),
+    surpriseMe: /\b(surprise me|anything|dealer'?s choice)\b/i.test(request),
+    familyFriendly,
+    preferInternational: /\b(international|foreign|subtitles?|subtitled|korean|spanish|european)\b/i.test(request),
+    keywords,
+  };
+}
+
+export function mergeIntents(saved: SessionIntent, session: SessionIntent): SessionIntent {
+  return {
+    genreIds: session.genreIds.length ? session.genreIds : saved.genreIds,
+    excludedGenreIds: [...new Set([...saved.excludedGenreIds, ...session.excludedGenreIds])],
+    ...(session.maxRuntime ? { maxRuntime: session.maxRuntime } : saved.maxRuntime ? { maxRuntime: saved.maxRuntime } : {}),
+    surpriseMe: session.surpriseMe,
+    familyFriendly: saved.familyFriendly || session.familyFriendly,
+    preferInternational: saved.preferInternational || session.preferInternational,
+    keywords: [...new Set([...saved.keywords, ...session.keywords])].slice(0, 16),
+  };
+}
+
+function titleScore(
+  title: DiscoverTitle,
+  minimumRating: number,
+  seed: string,
+  settings: PickSettings,
+  intent: SessionIntent,
+): number {
   const year = Number(title.year) || 2000;
   const recency = Math.max(0, year - 2015) * 0.25;
-  const international = title.international ? 10 : 0;
+  const international = title.international && settings.includeInternational
+    ? intent.preferInternational ? 8 : 2
+    : 0;
+  const preferredGenres = intent.genreIds.length ? intent.genreIds : settings.genreIds;
+  const genreAffinity = title.genreIds.filter((id) => preferredGenres.includes(id)).length * 4;
+  const searchable = `${title.title} ${title.overview}`.toLowerCase();
+  const keywordAffinity = intent.keywords.filter((keyword) => searchable.includes(keyword)).length * 2.5;
   return (title.rating - minimumRating) * 12
     + Math.log10(Math.max(title.voteCount, 1)) * 4
     + recency
     + international
-    + stableVariety(title.id, seed) * 6;
+    + genreAffinity
+    + keywordAffinity
+    + stableVariety(title.id, seed) * 10;
+}
+
+export function dedupeTitles(candidates: DiscoverTitle[]): DiscoverTitle[] {
+  return [...new Map(candidates.map((title) => [`${title.mediaType}:${title.id}`, title])).values()];
 }
 
 export function rankRecommendations({
@@ -78,6 +158,7 @@ export function rankRecommendations({
   watchedIds,
   settings,
   seed,
+  intent = interpretSessionRequest(''),
 }: {
   candidates: DiscoverTitle[];
   kind: RecommendedTitle['kind'];
@@ -85,6 +166,7 @@ export function rankRecommendations({
   watchedIds: Set<number>;
   settings: PickSettings;
   seed: string;
+  intent?: SessionIntent;
 }): RecommendedTitle[] {
   const minimumRating = kind === 'show' ? 7 : 6.6;
   const minimumVotes = kind === 'show' ? 150 : 300;
@@ -95,16 +177,18 @@ export function rankRecommendations({
     .filter((genre) => settings.genreIds.includes(genre.id))
     .map((genre) => genre.name.toLowerCase());
 
-  return candidates
+  const ranked = dedupeTitles(candidates)
     .filter((title) => !watchedIds.has(title.id))
     .filter((title) => title.rating >= minimumRating && title.voteCount >= minimumVotes)
     .filter((title) => settings.includeInternational || !title.international)
     .filter((title) => kind !== 'documentary' || title.genreIds.includes(99))
+    .filter((title) => intent.genreIds.length === 0 || intent.surpriseMe || title.genreIds.some((id) => intent.genreIds.includes(id)))
+    .filter((title) => !title.genreIds.some((id) => intent.excludedGenreIds.includes(id)))
     .map((title) => ({
       ...title,
       kind,
       providerNames,
-      score: titleScore(title, minimumRating, seed),
+      score: titleScore(title, minimumRating, seed, settings, intent),
       reason: [
         `A ${title.rating.toFixed(1)}-rated ${kind}`,
         providerNames.length ? `available with ${providerNames.join(' or ')}` : 'ready to stream',
@@ -112,6 +196,22 @@ export function rankRecommendations({
         settings.tasteNote.trim() ? `and your note: “${settings.tasteNote.trim()}”` : '',
       ].filter(Boolean).join(' '),
     }))
-    .toSorted((a, b) => b.score - a.score)
-    .slice(0, count);
+    .toSorted((a, b) => b.score - a.score);
+
+  const selected: RecommendedTitle[] = [];
+  const remaining = [...ranked];
+  while (selected.length < count && remaining.length) {
+    const best = remaining
+      .map((title) => ({
+        title,
+        adjusted: title.score - selected.reduce((penalty, chosen) => {
+          const sharedGenres = title.genreIds.filter((id) => chosen.genreIds.includes(id)).length;
+          return penalty + sharedGenres * 3 + (title.year === chosen.year ? 1.5 : 0);
+        }, 0),
+      }))
+      .toSorted((a, b) => b.adjusted - a.adjusted)[0].title;
+    selected.push(best);
+    remaining.splice(remaining.findIndex((title) => title.id === best.id), 1);
+  }
+  return selected;
 }

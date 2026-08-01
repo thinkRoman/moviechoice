@@ -18,7 +18,7 @@ import type {
 
 interface LibraryContextValue {
   authenticated: boolean;
-  itemFor(movieId: number): LibraryItem | undefined;
+  itemFor(mediaType: LibraryMovieInput['mediaType'], movieId: number): LibraryItem | undefined;
   pendingKey: string | null;
   toggle(movie: LibraryMovieInput, action: LibraryAction): Promise<void>;
 }
@@ -27,7 +27,7 @@ const LibraryContext = createContext<LibraryContextValue | null>(null);
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const { status } = useSession();
-  const [items, setItems] = useState<Record<number, LibraryItem>>({});
+  const [items, setItems] = useState<Record<string, LibraryItem>>({});
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [message, setMessage] = useState('');
 
@@ -37,13 +37,14 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       .then(async (response) => {
         if (!response.ok) return;
         const body = await response.json() as { items: LibraryItem[] };
-        setItems(Object.fromEntries(body.items.map((item) => [item.tmdbMovieId, item])));
+        setItems(Object.fromEntries(body.items.map((item) => [`${item.mediaType}:${item.tmdbMovieId}`, item])));
       })
       .catch(() => setMessage('Could not load your movie library.'));
   }, [status]);
 
   const toggle = useCallback(async (movie: LibraryMovieInput, action: LibraryAction) => {
-    const previous = items[movie.tmdbMovieId];
+    const itemKey = `${movie.mediaType}:${movie.tmdbMovieId}`;
+    const previous = items[itemKey];
     const field = action === 'watchlist' ? 'inWatchlist' : action;
     const nextValue = !previous?.[field];
     const optimistic: LibraryItem = {
@@ -62,7 +63,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     };
     const key = `${movie.tmdbMovieId}:${action}`;
     setPendingKey(key);
-    setItems((current) => ({ ...current, [movie.tmdbMovieId]: optimistic }));
+    setItems((current) => ({ ...current, [itemKey]: optimistic }));
 
     try {
       const response = await fetch(`/api/my-movies/${movie.tmdbMovieId}`, {
@@ -74,8 +75,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const body = await response.json() as { item: LibraryItem | null };
       setItems((current) => {
         const next = { ...current };
-        if (body.item) next[movie.tmdbMovieId] = body.item;
-        else delete next[movie.tmdbMovieId];
+        if (body.item) next[itemKey] = body.item;
+        else delete next[itemKey];
         return next;
       });
       setMessage(
@@ -90,8 +91,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     } catch {
       setItems((current) => {
         const next = { ...current };
-        if (previous) next[movie.tmdbMovieId] = previous;
-        else delete next[movie.tmdbMovieId];
+        if (previous) next[itemKey] = previous;
+        else delete next[itemKey];
         return next;
       });
       setMessage('That change could not be saved. Please try again.');
@@ -102,7 +103,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<LibraryContextValue>(() => ({
     authenticated: status === 'authenticated',
-    itemFor: (movieId) => items[movieId],
+    itemFor: (mediaType, movieId) => items[`${mediaType}:${movieId}`],
     pendingKey,
     toggle,
   }), [items, pendingKey, status, toggle]);

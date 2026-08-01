@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { DiscoverTitle } from '@/lib/tmdb';
 import {
   DEFAULT_PICK_SETTINGS,
+  dedupeTitles,
+  interpretSessionRequest,
+  mergeIntents,
   rankRecommendations,
 } from '@/lib/recommendations';
 
@@ -77,5 +80,40 @@ describe('rankRecommendations', () => {
     };
     expect(rankRecommendations(input).map((item) => item.id))
       .toEqual(rankRecommendations(input).map((item) => item.id));
+  });
+
+  it('turns a one-time request into retrieval constraints', () => {
+    expect(interpretSessionRequest('Family comedies under 90 minutes tonight')).toMatchObject({
+      genreIds: expect.arrayContaining([35, 10751]),
+      excludedGenreIds: [27],
+      maxRuntime: 90,
+      familyFriendly: true,
+    });
+  });
+
+  it('applies requested genres to the candidate set', () => {
+    const result = rankRecommendations({
+      candidates: [candidate({ id: 1, genreIds: [18] }), candidate({ id: 2, genreIds: [35] })],
+      kind: 'movie',
+      count: 2,
+      watchedIds: new Set(),
+      settings: DEFAULT_PICK_SETTINGS,
+      seed: 'fresh-request',
+      intent: interpretSessionRequest('Only comedies tonight'),
+    });
+    expect(result.map((item) => item.id)).toEqual([2]);
+  });
+
+  it('deduplicates titles returned by multiple provider and sort lanes', () => {
+    expect(dedupeTitles([candidate({ id: 1 }), candidate({ id: 1 }), candidate({ id: 2 })]))
+      .toHaveLength(2);
+  });
+
+  it('combines persistent taste with a stronger request for tonight', () => {
+    const intent = mergeIntents(
+      interpretSessionRequest('I love subtitled international drama'),
+      interpretSessionRequest('Only comedies tonight'),
+    );
+    expect(intent).toMatchObject({ genreIds: [35], preferInternational: true });
   });
 });

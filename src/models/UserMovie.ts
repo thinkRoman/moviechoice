@@ -4,6 +4,7 @@ export interface IUserMovie {
   _id: string;
   userId: Schema.Types.ObjectId;
   tmdbMovieId: number;
+  mediaType: 'movie' | 'tv';
   title: string;
   posterPath: string | null;
   releaseYear: string | null;
@@ -20,6 +21,7 @@ const UserMovieSchema = new Schema<IUserMovie>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     tmdbMovieId: { type: Number, required: true },
+    mediaType: { type: String, enum: ['movie', 'tv'], default: 'movie', required: true },
     title: { type: String, required: true, trim: true },
     posterPath: { type: String, default: null },
     releaseYear: { type: String, default: null },
@@ -32,6 +34,6 @@ const UserMovieSchema = new Schema<IUserMovie>(
   { timestamps: true },
 );
 
-UserMovieSchema.index({ userId: 1, tmdbMovieId: 1 }, { unique: true });
+UserMovieSchema.index({ userId: 1, mediaType: 1, tmdbMovieId: 1 }, { unique: true });
 
 export default models.UserMovie || model<IUserMovie>('UserMovie', UserMovieSchema);

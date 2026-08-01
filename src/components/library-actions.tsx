@@ -18,7 +18,7 @@ export default function LibraryActions({
   const { authenticated, itemFor, pendingKey, toggle } = useLibrary();
   if (!authenticated) return null;
 
-  const item = itemFor(movie.tmdbMovieId);
+  const item = itemFor(movie.mediaType, movie.tmdbMovieId);
   const actions: Array<{
     action: LibraryAction;
     active: boolean;

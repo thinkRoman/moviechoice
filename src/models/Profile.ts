@@ -26,6 +26,7 @@ export interface IProfile {
     thumbsDown: number[];
     ratings: { titleId: number; rating: number }[];
   };
+  recommendationHistory: string[];
   isPrimary: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -59,6 +60,7 @@ const ProfileSchema = new Schema<IProfile>(
         { titleId: { type: Number }, rating: { type: Number } },
       ],
     },
+    recommendationHistory: [{ type: String }],
     isPrimary: { type: Boolean, default: false },
   },
   { timestamps: true }

@@ -13,6 +13,7 @@ const updateSchema = z.object({
   title: z.string().trim().min(1).max(300),
   posterPath: z.string().nullable(),
   releaseYear: z.string().regex(/^\d{4}$/).nullable(),
+  mediaType: z.enum(['movie', 'tv']),
 });
 
 export async function PUT(
@@ -32,6 +33,7 @@ export async function PUT(
       session?.user?.id,
       {
         tmdbMovieId: movieId,
+        mediaType: parsed.data.mediaType,
         title: parsed.data.title,
         posterPath: parsed.data.posterPath,
         releaseYear: parsed.data.releaseYear,

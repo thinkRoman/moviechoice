@@ -2,6 +2,7 @@ export type LibraryAction = 'watchlist' | 'watched' | 'favorite' | 'dismissed';
 
 export interface LibraryMovieInput {
   tmdbMovieId: number;
+  mediaType: 'movie' | 'tv';
   title: string;
   posterPath: string | null;
   releaseYear: string | null;

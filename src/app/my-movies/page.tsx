@@ -26,7 +26,7 @@ function LibraryCard({
 
   return (
     <article className="min-w-0">
-      <Link href={`/movies/${item.tmdbMovieId}`} className="group block min-w-0">
+      <Link href={item.mediaType === 'movie' ? `/movies/${item.tmdbMovieId}` : `https://www.themoviedb.org/tv/${item.tmdbMovieId}`} className="group block min-w-0">
         <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/10 transition duration-300 group-hover:-translate-y-1 group-hover:ring-violet-400/40">
         {posterUrl ? (
           <Image
@@ -51,6 +51,7 @@ function LibraryCard({
         listAction={listAction}
         movie={{
           tmdbMovieId: item.tmdbMovieId,
+          mediaType: item.mediaType,
           title: item.title,
           posterPath: item.posterPath,
           releaseYear: item.releaseYear,

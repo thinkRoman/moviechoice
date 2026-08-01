@@ -11,6 +11,7 @@ import {
 
 const inception: LibraryMovieInput = {
   tmdbMovieId: 27205,
+  mediaType: 'movie',
   title: 'Inception',
   posterPath: '/poster.jpg',
   releaseYear: '2010',

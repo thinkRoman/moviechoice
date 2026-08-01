@@ -11,6 +11,7 @@ export default function MovieCard({ movie, priority = false }: { movie: MovieSum
         compact
         movie={{
           tmdbMovieId: movie.id,
+          mediaType: 'movie',
           title: movie.title,
           posterPath: movie.posterPath,
           releaseYear: movie.year,

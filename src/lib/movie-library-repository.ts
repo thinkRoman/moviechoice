@@ -10,6 +10,7 @@ import type {
 function serialize(item: {
   _id: { toString(): string };
   tmdbMovieId: number;
+  mediaType?: 'movie' | 'tv';
   title: string;
   posterPath: string | null;
   releaseYear: string | null;
@@ -23,6 +24,7 @@ function serialize(item: {
   return {
     id: item._id.toString(),
     tmdbMovieId: item.tmdbMovieId,
+    mediaType: item.mediaType || 'movie',
     title: item.title,
     posterPath: item.posterPath,
     releaseYear: item.releaseYear,
@@ -66,8 +68,8 @@ export const movieLibraryRepository: MovieLibraryRepository = {
     }
 
     const item = await UserMovie.findOneAndUpdate(
-      { userId, tmdbMovieId: movie.tmdbMovieId },
-      { $set: set, $setOnInsert: { userId, tmdbMovieId: movie.tmdbMovieId } },
+      { userId, mediaType: movie.mediaType, tmdbMovieId: movie.tmdbMovieId },
+      { $set: set, $setOnInsert: { userId, mediaType: movie.mediaType, tmdbMovieId: movie.tmdbMovieId } },
       { new: true, upsert: value, runValidators: true },
     );
 
