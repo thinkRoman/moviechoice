@@ -40,6 +40,14 @@ export interface RecommendedTitle extends DiscoverTitle {
   reason: string;
   providerNames: string[];
   score: number;
+  runtimeMinutes?: number | null;
+  episodeCount?: number | null;
+  seasonCount?: number | null;
+  genreNames?: string[];
+  languageName?: string | null;
+  primaryProvider?: string | null;
+  tmdbUrl?: string;
+  letterboxdUrl?: string | null;
 }
 
 export interface SessionIntent {
@@ -63,6 +71,15 @@ export const DEFAULT_PICK_SETTINGS: PickSettings = {
   includeInternational: true,
   weeklyRefresh: false,
 };
+
+export function formatRuntime(minutes: number | null | undefined): string | null {
+  if (!minutes || minutes <= 0) return null;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (!hours) return `${mins}M`;
+  if (!mins) return `${hours}H`;
+  return `${hours}H ${mins}M`;
+}
 
 function stableVariety(id: number, seed: string): number {
   let hash = id;
@@ -184,18 +201,36 @@ export function rankRecommendations({
     .filter((title) => kind !== 'documentary' || title.genreIds.includes(99))
     .filter((title) => intent.genreIds.length === 0 || intent.surpriseMe || title.genreIds.some((id) => intent.genreIds.includes(id)))
     .filter((title) => !title.genreIds.some((id) => intent.excludedGenreIds.includes(id)))
-    .map((title) => ({
-      ...title,
-      kind,
-      providerNames,
-      score: titleScore(title, minimumRating, seed, settings, intent),
-      reason: [
-        `A ${title.rating.toFixed(1)}-rated ${kind}`,
-        providerNames.length ? `available with ${providerNames.join(' or ')}` : 'ready to stream',
-        genreNames.length ? `that matches your ${genreNames.slice(0, 2).join(' and ')} mood` : 'chosen for its strong audience trust',
-        settings.tasteNote.trim() ? `and your note: “${settings.tasteNote.trim()}”` : '',
-      ].filter(Boolean).join(' '),
-    }))
+    .map((title) => {
+      const titleGenreNames = title.genreIds
+        .map((id) => PICK_GENRES.find((genre) => genre.id === id)?.name)
+        .filter((name): name is NonNullable<typeof name> => Boolean(name))
+        .slice(0, 3);
+      return {
+        ...title,
+        kind,
+        providerNames,
+        primaryProvider: providerNames[0] || null,
+        genreNames: titleGenreNames,
+        languageName: null,
+        runtimeMinutes: null,
+        episodeCount: null,
+        seasonCount: null,
+        tmdbUrl: title.mediaType === 'movie'
+          ? `https://www.themoviedb.org/movie/${title.id}`
+          : `https://www.themoviedb.org/tv/${title.id}`,
+        letterboxdUrl: title.mediaType === 'movie'
+          ? `https://letterboxd.com/search/${encodeURIComponent(title.title)}/`
+          : null,
+        score: titleScore(title, minimumRating, seed, settings, intent),
+        reason: [
+          `A ${title.rating.toFixed(1)}-rated ${kind}`,
+          providerNames.length ? `available with ${providerNames.join(' or ')}` : 'ready to stream',
+          genreNames.length ? `that matches your ${genreNames.slice(0, 2).join(' and ')} mood` : 'chosen for its strong audience trust',
+          settings.tasteNote.trim() ? `and your note: “${settings.tasteNote.trim()}”` : '',
+        ].filter(Boolean).join(' '),
+      };
+    })
     .toSorted((a, b) => b.score - a.score);
 
   const selected: RecommendedTitle[] = [];
