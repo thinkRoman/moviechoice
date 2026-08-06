@@ -101,8 +101,7 @@ export async function createMember(
   role: UserRole | undefined,
   input: { name: string; email: string; pin?: string; monthlyAiLimitUsd?: number },
   repository: MemberRepository,
-  sendInvitation: (input: { name: string; email: string; pin: string }) => Promise<void>,
-): Promise<SafeAccessUser> {
+): Promise<{ user: SafeAccessUser; pin: string }> {
   requireOwner(role);
   const email = normalizeEmail(input.email);
   const pin = input.pin && /^\d{6}$/.test(input.pin) ? input.pin : generatePin();
@@ -116,8 +115,7 @@ export async function createMember(
     status: 'ACTIVE',
     monthlyAiLimitUsd: input.monthlyAiLimitUsd,
   });
-  await sendInvitation({ name: user.name, email, pin });
-  return user;
+  return { user, pin };
 }
 
 export async function changeMemberStatus(
@@ -134,12 +132,11 @@ export async function regenerateMemberPin(
   role: UserRole | undefined,
   id: string,
   repository: MemberRepository,
-  sendInvitation: (input: { name: string; email: string; pin: string }) => Promise<void>,
-): Promise<SafeAccessUser | null> {
+): Promise<{ user: SafeAccessUser; pin: string } | null> {
   requireOwner(role);
   const pin = generatePin();
   const { pinHash, pinSalt } = hashPin(pin);
   const user = await repository.setPin(id, pinHash, pinSalt);
-  if (user) await sendInvitation({ name: user.name, email: user.email, pin });
-  return user;
+  if (!user) return null;
+  return { user, pin };
 }

@@ -50,7 +50,11 @@ export const memberRepository: MemberRepository = {
     await dbConnect();
     const user = await User.create(input);
     // Each invited PIN user gets their own Profile for settings + recommendation history.
-    await ensureUserProfile(user._id.toString(), user.name);
+    try {
+      await ensureUserProfile(user._id.toString(), user.name);
+    } catch (error) {
+      console.error('ensureUserProfile after invite failed', error);
+    }
     return toSafeUser(user);
   },
 

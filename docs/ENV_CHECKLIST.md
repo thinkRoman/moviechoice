@@ -6,17 +6,27 @@ Set these in **Vercel → Project → Settings → Environment Variables**. Neve
 
 | Variable | Purpose |
 |----------|---------|
-| `MONGODB_URI` | MongoDB Atlas connection string |
+| `MONGODB_URI` | MongoDB Atlas connection string — must start with `mongodb://` or `mongodb+srv://`. **Do not wrap in quotes** in Vercel. |
 | `MONGODB_DB` | Database name (e.g. `moviechoice`) |
-| `NEXTAUTH_SECRET` | Random 32+ char secret |
-| `NEXTAUTH_URL` | Production URL (`https://your-domain`) |
+| `NEXTAUTH_SECRET` / `AUTH_SECRET` | Random 32+ char secret |
+| `NEXTAUTH_URL` / `AUTH_URL` | Production URL (`https://your-domain`) |
 | `OWNER_EMAIL` | Owner login email |
 | `OWNER_PIN` | Owner 6-digit PIN |
 | `TMDB_API_READ_ACCESS_TOKEN` | TMDB Bearer token |
 | `TMDB_BASE_URL` | `https://api.themoviedb.org/3` |
 | `OPENAI_API_KEY` | Personalized pick blurbs |
 | `RESEND_API_KEY` | Invite PIN emails |
-| `EMAIL_FROM` | Verified Resend from-address |
+| `EMAIL_FROM` / `RESEND_FROM` | Verified Resend from-address |
+
+### MONGODB_URI checklist
+
+If Recommend Now / Invite show `Invalid scheme…`, open **Vercel → Settings → Environment Variables** and fix `MONGODB_URI`:
+
+1. Value must look like: `mongodb+srv://USER:PASSWORD@cluster.mongodb.net/?retryWrites=true&w=majority`
+2. No leading/trailing quotes (`"..."` / `'...'`)
+3. No `MONGODB_DB` value pasted into `MONGODB_URI` by mistake
+4. Redeploy after saving
+
 
 ## Recommended
 

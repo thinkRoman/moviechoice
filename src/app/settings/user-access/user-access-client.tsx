@@ -44,15 +44,22 @@ export default function UserAccessClient() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: name.trim(), email: email.trim(), pin }),
     });
-    const body = await response.json().catch(() => ({})) as { error?: string };
+    const body = await response.json().catch(() => ({})) as {
+      error?: string;
+      message?: string;
+      emailed?: boolean;
+      pin?: string;
+    };
     setBusy(false);
-    setMessage(response.ok ? 'User added — PIN emailed via Resend.' : (body.error || 'Could not invite user.'));
     if (response.ok) {
+      setMessage(body.message || (body.emailed ? 'User added and PIN emailed.' : 'User added.'));
       setName('');
       setEmail('');
       setPin('');
       await loadUsers();
+      return;
     }
+    setMessage(body.error || body.message || 'Could not invite user.');
   }
 
   async function setStatus(user: SafeAccessUser) {
@@ -75,7 +82,8 @@ export default function UserAccessClient() {
       method: 'POST',
       credentials: 'include',
     });
-    setMessage(response.ok ? 'A new PIN was emailed.' : 'Could not regenerate PIN.');
+    const body = await response.json().catch(() => ({})) as { error?: string; message?: string };
+    setMessage(response.ok ? (body.message || 'A new PIN was emailed.') : (body.error || 'Could not regenerate PIN.'));
     setBusy(false);
   }
 
