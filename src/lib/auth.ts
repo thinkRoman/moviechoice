@@ -1,5 +1,6 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
+import mongoose from 'mongoose';
 import dbConnect from '@/lib/mongodb';
 import User from '@/models/User';
 import { authenticateAccess, ownerId, type UserRole } from '@/lib/access';
@@ -39,8 +40,12 @@ async function persistOwnerIdentity(email: string, name: string, preferredId: st
     return existing._id.toString();
   }
 
+  const objectId = mongoose.Types.ObjectId.isValid(preferredId)
+    ? new mongoose.Types.ObjectId(preferredId)
+    : new mongoose.Types.ObjectId();
+
   await User.create({
-    _id: preferredId,
+    _id: objectId,
     email,
     name,
     emailVerified: new Date(),
@@ -48,7 +53,21 @@ async function persistOwnerIdentity(email: string, name: string, preferredId: st
     status: 'ACTIVE',
     lastLoginAt: new Date(),
   });
-  return preferredId;
+  return objectId.toString();
+}
+
+async function bootstrapAfterLogin(id: string, name: string, role: UserRole, email: string) {
+  // Never let profile bootstrap break an otherwise valid sign-in.
+  try {
+    if (role === 'OWNER') {
+      // Owner identity already persisted in authorize path.
+    } else {
+      await User.updateOne({ _id: id }, { $set: { lastLoginAt: new Date() } });
+    }
+    await ensureUserProfile(id, name || email || 'Movie lover');
+  } catch (error) {
+    console.error('Post-login profile bootstrap failed', { id, email, error });
+  }
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -87,16 +106,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!principal) return null;
 
-        if (principal.role === 'OWNER') {
-          const preferredId = principal.id || ownerId(principal.email);
-          const id = await persistOwnerIdentity(principal.email, principal.name, preferredId);
-          await ensureUserProfile(id, principal.name);
-          return { ...principal, id };
+        let id = principal.id;
+        try {
+          if (principal.role === 'OWNER') {
+            const preferredId = principal.id || ownerId(principal.email);
+            id = await persistOwnerIdentity(principal.email, principal.name, preferredId);
+          }
+        } catch (error) {
+          console.error('Owner identity persistence failed', error);
+          // Keep synthetic owner id so JWT still has a stable subject.
+          id = principal.id || ownerId(principal.email);
         }
 
-        await User.updateOne({ _id: principal.id }, { $set: { lastLoginAt: new Date() } });
-        await ensureUserProfile(principal.id, principal.name);
-        return principal;
+        await bootstrapAfterLogin(id, principal.name, principal.role, principal.email);
+
+        return {
+          id,
+          name: principal.name,
+          email: principal.email,
+          role: principal.role,
+        };
       },
     }),
   ],
@@ -104,27 +133,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  pages: {
+    signIn: '/signin',
+  },
   callbacks: {
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = String(token.id || '');
-        session.user.name = (token.name as string | null) ?? session.user.name ?? null;
-        session.user.email = (token.email as string | null) ?? session.user.email ?? null;
-        session.user.image = (token.image as string | null) ?? session.user.image ?? null;
-        session.user.role = token.role as UserRole;
-      }
-      return session;
-    },
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        const id = user.id || token.sub || '';
+        token.sub = id;
+        token.id = id;
         token.role = user.role;
         token.name = user.name ?? null;
         token.email = user.email ?? null;
-        token.image = user.image ?? null;
+        token.picture = user.image ?? null;
       }
+      if (!token.id && token.sub) token.id = token.sub;
       return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        const id = String(token.id || token.sub || '');
+        session.user.id = id;
+        session.user.name = (token.name as string | null) ?? session.user.name ?? null;
+        session.user.email = (token.email as string | null) ?? session.user.email ?? null;
+        session.user.image = (token.picture as string | null) ?? session.user.image ?? null;
+        session.user.role = (token.role as UserRole) || 'MEMBER';
+      }
+      return session;
     },
   },
   trustHost: true,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
 });
