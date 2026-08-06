@@ -92,6 +92,16 @@ describe('rankRecommendations', () => {
     });
   });
 
+  it('handles empty and exclusion requests without throwing', () => {
+    expect(interpretSessionRequest('')).toMatchObject({ genreIds: [], excludedGenreIds: [] });
+    expect(interpretSessionRequest('no sci-fi tonight')).toMatchObject({
+      excludedGenreIds: expect.arrayContaining([878]),
+    });
+    expect(interpretSessionRequest('avoid horror and no comedy')).toMatchObject({
+      excludedGenreIds: expect.arrayContaining([27, 35]),
+    });
+  });
+
   it('applies requested genres to the candidate set', () => {
     const result = rankRecommendations({
       candidates: [candidate({ id: 1, genreIds: [18] }), candidate({ id: 2, genreIds: [35] })],

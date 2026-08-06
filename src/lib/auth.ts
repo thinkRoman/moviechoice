@@ -131,7 +131,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60, // 30 days — PIN once, stay signed in
+    updateAge: 24 * 60 * 60, // refresh cookie once per day while active
   },
   pages: {
     signIn: '/signin',
@@ -139,7 +140,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        const id = user.id || token.sub || '';
+        const id = String(user.id || token.sub || '');
         token.sub = id;
         token.id = id;
         token.role = user.role;
@@ -148,6 +149,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.picture = user.image ?? null;
       }
       if (!token.id && token.sub) token.id = token.sub;
+      // Last resort: keep a stable subject from email so pages don't bounce to sign-in.
+      if (!token.id && token.email) {
+        const fallbackId = ownerId(String(token.email));
+        token.id = fallbackId;
+        token.sub = fallbackId;
+      }
       return token;
     },
     async session({ session, token }) {

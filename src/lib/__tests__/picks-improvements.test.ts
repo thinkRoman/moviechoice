@@ -39,9 +39,11 @@ describe('weekly refresh + onboarding helpers', () => {
     expect(needsWeeklyRefresh(true, '2026-08-01T12:00:00Z', thursday)).toBe(false);
   });
 
-  it('detects first-run onboarding for default settings', () => {
-    expect(isOnboardingNeeded(DEFAULT_PICK_SETTINGS, null)).toBe(true);
-    expect(isOnboardingNeeded(DEFAULT_PICK_SETTINGS, new Date())).toBe(false);
+  it('detects first-run onboarding only when no streaming services are set', () => {
+    expect(isOnboardingNeeded(DEFAULT_PICK_SETTINGS, null)).toBe(false);
+    expect(isOnboardingNeeded({ ...DEFAULT_PICK_SETTINGS, providerIds: [] }, null)).toBe(true);
+    expect(isOnboardingNeeded({ ...DEFAULT_PICK_SETTINGS, providerIds: [] }, new Date())).toBe(false);
+    expect(isOnboardingNeeded({ ...DEFAULT_PICK_SETTINGS, providerIds: [] }, null, new Date())).toBe(false);
     expect(isOnboardingNeeded({ ...DEFAULT_PICK_SETTINGS, providerIds: [8, 337] }, null)).toBe(false);
   });
 });

@@ -201,15 +201,14 @@ export function needsWeeklyRefresh(
   return last < friday;
 }
 
-export function isOnboardingNeeded(settings: PickSettings, onboardingCompletedAt?: string | Date | null): boolean {
-  if (onboardingCompletedAt) return false;
-  const sameProviders =
-    settings.providerIds.length === DEFAULT_PICK_SETTINGS.providerIds.length
-    && settings.providerIds.every((id) => DEFAULT_PICK_SETTINGS.providerIds.includes(id));
-  const sameCounts =
-    settings.movieCount === DEFAULT_PICK_SETTINGS.movieCount
-    && settings.showCount === DEFAULT_PICK_SETTINGS.showCount;
-  return sameProviders && sameCounts && !settings.tasteNote.trim();
+export function isOnboardingNeeded(
+  settings: PickSettings,
+  onboardingCompletedAt?: string | Date | null,
+  lastGeneratedAt?: string | Date | null,
+): boolean {
+  if (onboardingCompletedAt || lastGeneratedAt) return false;
+  // Only nudge setup when the user has no streaming services chosen.
+  return settings.providerIds.length === 0;
 }
 
 
@@ -219,16 +218,16 @@ function stableVariety(id: number, seed: string): number {
   return (Math.abs(hash) % 1000) / 1000;
 }
 
-const GENRE_TERMS: Array<{ id: number; terms: RegExp }> = [
-  { id: 28, terms: /\b(action|adventure|exciting)\b/i },
-  { id: 35, terms: /\b(comedy|comedies|funny|laugh|lighthearted)\b/i },
-  { id: 18, terms: /\b(drama|dramatic|emotional)\b/i },
-  { id: 27, terms: /\b(horror|scary|frightening)\b/i },
-  { id: 9648, terms: /\b(mystery|mysteries|whodunnit)\b/i },
-  { id: 10749, terms: /\b(romance|romantic|date night)\b/i },
-  { id: 878, terms: /\b(sci[ -]?fi|science fiction|futuristic)\b/i },
-  { id: 53, terms: /\b(thriller|suspense|tense)\b/i },
-  { id: 99, terms: /\b(documentary|documentaries|nonfiction)\b/i },
+const GENRE_TERMS: Array<{ id: number; exclude: RegExp; terms: RegExp }> = [
+  { id: 28, exclude: /\b(?:no|not|avoid|without)\s+action\b/i, terms: /\b(action|adventure|exciting)\b/i },
+  { id: 35, exclude: /\b(?:no|not|avoid|without)\s+comed(?:y|ies)\b/i, terms: /\b(comedy|comedies|funny|laugh|lighthearted)\b/i },
+  { id: 18, exclude: /\b(?:no|not|avoid|without)\s+drama\b/i, terms: /\b(drama|dramatic|emotional)\b/i },
+  { id: 27, exclude: /\b(?:no|not|avoid|without)\s+horror\b/i, terms: /\b(horror|scary|frightening)\b/i },
+  { id: 9648, exclude: /\b(?:no|not|avoid|without)\s+myster(?:y|ies)\b/i, terms: /\b(mystery|mysteries|whodunnit)\b/i },
+  { id: 10749, exclude: /\b(?:no|not|avoid|without)\s+romance\b/i, terms: /\b(romance|romantic|date night)\b/i },
+  { id: 878, exclude: /\b(?:no|not|avoid|without)\s+(?:sci-?fi|science fiction)\b/i, terms: /\b(sci[ -]?fi|science fiction|futuristic)\b/i },
+  { id: 53, exclude: /\b(?:no|not|avoid|without)\s+thriller\b/i, terms: /\b(thriller|suspense|tense)\b/i },
+  { id: 99, exclude: /\b(?:no|not|avoid|without)\s+documentar(?:y|ies)\b/i, terms: /\b(documentary|documentaries|nonfiction)\b/i },
 ];
 
 const STOP_WORDS = new Set([
@@ -237,24 +236,25 @@ const STOP_WORDS = new Set([
 ]);
 
 export function interpretSessionRequest(request: string): SessionIntent {
+  const text = typeof request === 'string' ? request : '';
   const excludedGenreIds = GENRE_TERMS
-    .filter(({ terms }) => new RegExp(`\\b(?:no|not|avoid|without)\\s+(?:${terms.source.replace(/^\\b|\\b\/?[a-z]*$/g, '')})`, 'i').test(request))
+    .filter(({ exclude }) => exclude.test(text))
     .map(({ id }) => id);
   const genreIds = GENRE_TERMS
-    .filter(({ id, terms }) => !excludedGenreIds.includes(id) && terms.test(request))
+    .filter(({ id, terms }) => !excludedGenreIds.includes(id) && terms.test(text))
     .map(({ id }) => id);
-  const familyFriendly = /\b(family|family-friendly|kids?|children)\b/i.test(request);
-  const maxRuntimeMatch = request.match(/\b(?:under|less than|only have|max(?:imum)?)\s*(\d{2,3})\s*(?:minutes?|mins?)\b/i);
-  const keywords = request.toLowerCase().match(/[a-z][a-z-]+/g)
+  const familyFriendly = /\b(family|family-friendly|kids?|children)\b/i.test(text);
+  const maxRuntimeMatch = text.match(/\b(?:under|less than|only have|max(?:imum)?)\s*(\d{2,3})\s*(?:minutes?|mins?)\b/i);
+  const keywords = text.toLowerCase().match(/[a-z][a-z-]+/g)
     ?.filter((word) => word.length > 3 && !STOP_WORDS.has(word))
     .slice(0, 12) || [];
   return {
     genreIds: familyFriendly ? [...new Set([...genreIds, 10751])] : genreIds,
     excludedGenreIds: [...new Set([...excludedGenreIds, ...(familyFriendly ? [27] : [])])],
     ...(maxRuntimeMatch ? { maxRuntime: Number(maxRuntimeMatch[1]) } : {}),
-    surpriseMe: /\b(surprise me|anything|dealer'?s choice)\b/i.test(request),
+    surpriseMe: /\b(surprise me|anything|dealer'?s choice)\b/i.test(text),
     familyFriendly,
-    preferInternational: /\b(international|foreign|subtitles?|subtitled|korean|spanish|european)\b/i.test(request),
+    preferInternational: /\b(international|foreign|subtitles?|subtitled|korean|spanish|european)\b/i.test(text),
     keywords,
   };
 }

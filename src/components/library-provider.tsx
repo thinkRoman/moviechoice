@@ -33,7 +33,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (status !== 'authenticated') return;
-    fetch('/api/my-movies', { cache: 'no-store' })
+    fetch('/api/my-movies', { cache: 'no-store', credentials: 'include' })
       .then(async (response) => {
         if (!response.ok) return;
         const body = await response.json() as { items: LibraryItem[] };
@@ -68,6 +68,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/my-movies/${movie.tmdbMovieId}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...movie, action, value: nextValue }),
       });

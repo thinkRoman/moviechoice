@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { explainRecommendations } from '@/lib/ai/explanations';
 import { cachedEnrichDiscoverTitle } from '@/lib/catalog-cache';
+import { createRequestId } from '@/lib/id';
 import dbConnect from '@/lib/mongodb';
 import { discoverTitles, getTitleRecommendations } from '@/lib/tmdb';
 import {
@@ -51,7 +52,7 @@ const sessionOverridesSchema = z.object({
 const generationSchema = z.object({
   overrides: sessionOverridesSchema.optional().default({}),
   sessionRequest: z.string().trim().max(240).optional().default(''),
-  refreshToken: z.string().min(1).max(100).optional().default(() => crypto.randomUUID()),
+  refreshToken: z.string().min(1).max(100).optional(),
 });
 
 function tokenNumber(token: string): number {
@@ -172,7 +173,7 @@ export async function GET() {
       settings,
       lastGeneratedAt,
       needsWeeklyRefresh: needsWeeklyRefresh(settings.weeklyRefresh, lastGeneratedAt),
-      needsOnboarding: isOnboardingNeeded(settings, onboardingCompletedAt),
+      needsOnboarding: isOnboardingNeeded(settings, onboardingCompletedAt, lastGeneratedAt),
     });
   } catch (error) {
     console.error('GET /api/recommendations failed', error);
@@ -186,185 +187,225 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const generation = generationSchema.safeParse(await request.json().catch(() => ({})));
-  if (!generation.success) {
-    return NextResponse.json({ error: generation.error.issues[0]?.message || 'Invalid session preferences' }, { status: 400 });
-  }
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Please sign in to get picks.' }, { status: 401 });
+    }
 
-  await dbConnect();
-  await ensureUserProfile(session.user.id, session.user.name || 'Movie lover');
-  const profile = await Profile.findOne({ userId: session.user.id }).lean();
-  const settings = { ...profileSettings(profile), ...generation.data.overrides };
-  const parsed = settingsSchema.safeParse(settings);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid settings' }, { status: 400 });
-  }
+    const generation = generationSchema.safeParse(await request.json().catch(() => ({})));
+    if (!generation.success) {
+      return NextResponse.json(
+        { error: generation.error.issues[0]?.message || 'Invalid session preferences' },
+        { status: 400 },
+      );
+    }
 
-  const effectiveSettings = parsed.data;
-  const intent = mergeIntents(
-    interpretSessionRequest(effectiveSettings.tasteNote),
-    interpretSessionRequest(generation.data.sessionRequest),
-  );
+    const refreshToken = generation.data.refreshToken || createRequestId();
 
-  const library = await UserMovie.find({ userId: session.user.id })
-    .select('tmdbMovieId mediaType watched dismissed favorite')
-    .lean();
-  const suppressed = library.filter((item) => item.watched || item.dismissed);
-  const favorites = library.filter((item) => item.favorite);
-  const softAvoidGenreIds: number[] = [];
+    await dbConnect();
+    try {
+      await ensureUserProfile(session.user.id, session.user.name || 'Movie lover');
+    } catch (error) {
+      console.error('ensureUserProfile during picks failed', error);
+    }
 
-  const watchedMovieIds = new Set(suppressed.filter((item) => (item.mediaType || 'movie') === 'movie').map((item) => item.tmdbMovieId));
-  const watchedShowIds = new Set(suppressed.filter((item) => item.mediaType === 'tv').map((item) => item.tmdbMovieId));
-  const providerQuery = effectiveSettings.providerIds.join('|');
-  const requestedGenres = intent.surpriseMe || intent.genreIds.length === 0
-    ? effectiveSettings.genreIds
-    : intent.genreIds;
-  const genreQuery = (intent.surpriseMe ? [] : requestedGenres)
-    .filter((id) => id !== 99)
-    .join(intent.genreIds.length ? ',' : '|');
-  const earliest = `${new Date().getUTCFullYear() - effectiveSettings.yearsBack}-01-01`;
-  const common = {
-    with_watch_providers: providerQuery,
-    ...(genreQuery ? { with_genres: genreQuery } : {}),
-  };
-  const movieParams = {
-    ...common,
-    'primary_release_date.gte': earliest,
-    'vote_count.gte': '300',
-    'vote_average.gte': '6.6',
-    'with_runtime.gte': '65',
-    ...(intent.maxRuntime ? { 'with_runtime.lte': String(intent.maxRuntime) } : {}),
-  };
-  const showParams = {
-    ...common,
-    'first_air_date.gte': earliest,
-    'vote_count.gte': '150',
-    'vote_average.gte': '7',
-  };
+    const profile = await Profile.findOne({ userId: session.user.id }).lean();
+    const settings = { ...profileSettings(profile), ...generation.data.overrides };
+    const parsed = settingsSchema.safeParse(settings);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || 'Invalid settings' },
+        { status: 400 },
+      );
+    }
 
-  const movieFetchCount = Math.max(effectiveSettings.movieCount * 4, effectiveSettings.movieCount + 6);
-  const showFetchCount = Math.max(effectiveSettings.showCount * 4, effectiveSettings.showCount + 6);
-  const docFetchCount = Math.max(effectiveSettings.documentaryCount * 3, effectiveSettings.documentaryCount + 3);
+    const effectiveSettings = parsed.data;
+    if (!effectiveSettings.providerIds.length) {
+      return NextResponse.json(
+        { error: 'Choose at least one streaming service in Settings first.' },
+        { status: 400 },
+      );
+    }
 
-  const [moviesRaw, showsRaw, documentaries, movieSeeds, showSeeds] = await Promise.all([
-    effectiveSettings.movieCount
-      ? discoverBroadly('movie', movieParams, effectiveSettings.providerIds, generation.data.refreshToken)
-      : Promise.resolve([]),
-    effectiveSettings.showCount
-      ? discoverBroadly('tv', showParams, effectiveSettings.providerIds, generation.data.refreshToken)
-      : Promise.resolve([]),
-    effectiveSettings.documentaryCount
-      ? discoverBroadly('movie', {
-          with_watch_providers: providerQuery,
-          with_genres: '99',
-          'primary_release_date.gte': earliest,
-          'vote_count.gte': '300',
-          'vote_average.gte': '6.6',
-        }, effectiveSettings.providerIds, `${generation.data.refreshToken}:documentary`)
-      : Promise.resolve([]),
-    Promise.all(
-      favorites
+    const intent = mergeIntents(
+      interpretSessionRequest(effectiveSettings.tasteNote),
+      interpretSessionRequest(generation.data.sessionRequest),
+    );
+
+    const library = await UserMovie.find({ userId: session.user.id })
+      .select('tmdbMovieId mediaType watched dismissed favorite')
+      .lean();
+    const suppressed = library.filter((item) => item.watched || item.dismissed);
+    const favorites = library.filter((item) => item.favorite);
+    const softAvoidGenreIds: number[] = [];
+
+    const watchedMovieIds = new Set(
+      suppressed
         .filter((item) => (item.mediaType || 'movie') === 'movie')
-        .slice(0, 3)
-        .map((item) => getTitleRecommendations('movie', item.tmdbMovieId)),
-    ).then((rows) => rows.flat()),
-    Promise.all(
-      favorites
-        .filter((item) => item.mediaType === 'tv')
-        .slice(0, 3)
-        .map((item) => getTitleRecommendations('tv', item.tmdbMovieId)),
-    ).then((rows) => rows.flat()),
-  ]);
+        .map((item) => item.tmdbMovieId),
+    );
+    const watchedShowIds = new Set(
+      suppressed.filter((item) => item.mediaType === 'tv').map((item) => item.tmdbMovieId),
+    );
+    const providerQuery = effectiveSettings.providerIds.join('|');
+    const requestedGenres = intent.surpriseMe || intent.genreIds.length === 0
+      ? effectiveSettings.genreIds
+      : intent.genreIds;
+    const genreQuery = (intent.surpriseMe ? [] : requestedGenres)
+      .filter((id) => id !== 99)
+      .join(intent.genreIds.length ? ',' : '|');
+    const earliest = `${new Date().getUTCFullYear() - effectiveSettings.yearsBack}-01-01`;
+    const common = {
+      with_watch_providers: providerQuery,
+      ...(genreQuery ? { with_genres: genreQuery } : {}),
+    };
+    const movieParams = {
+      ...common,
+      'primary_release_date.gte': earliest,
+      'vote_count.gte': '300',
+      'vote_average.gte': '6.6',
+      'with_runtime.gte': '65',
+      ...(intent.maxRuntime ? { 'with_runtime.lte': String(intent.maxRuntime) } : {}),
+    };
+    const showParams = {
+      ...common,
+      'first_air_date.gte': earliest,
+      'vote_count.gte': '150',
+      'vote_average.gte': '7',
+    };
 
-  const moviesMerged = mergeSeedCandidates(moviesRaw, movieSeeds);
-  const showsMerged = mergeSeedCandidates(showsRaw, showSeeds);
+    const movieFetchCount = Math.max(effectiveSettings.movieCount * 4, effectiveSettings.movieCount + 6);
+    const showFetchCount = Math.max(effectiveSettings.showCount * 4, effectiveSettings.showCount + 6);
+    const docFetchCount = Math.max(effectiveSettings.documentaryCount * 3, effectiveSettings.documentaryCount + 3);
 
-  const history = new Set((profile as { recommendationHistory?: string[] } | null)?.recommendationHistory || []);
-  const movieSuppressed = new Set([
-    ...watchedMovieIds,
-    ...[...history].filter((key) => key.startsWith('movie:')).map((key) => Number(key.slice(6))),
-  ]);
-  const showSuppressed = new Set([
-    ...watchedShowIds,
-    ...[...history].filter((key) => key.startsWith('tv:')).map((key) => Number(key.slice(3))),
-  ]);
-  const seed = `${session.user.id}:${generation.data.refreshToken}:${JSON.stringify(effectiveSettings)}:${generation.data.sessionRequest}`;
+    const [moviesRaw, showsRaw, documentaries, movieSeeds, showSeeds] = await Promise.all([
+      effectiveSettings.movieCount
+        ? discoverBroadly('movie', movieParams, effectiveSettings.providerIds, refreshToken)
+        : Promise.resolve([]),
+      effectiveSettings.showCount
+        ? discoverBroadly('tv', showParams, effectiveSettings.providerIds, refreshToken)
+        : Promise.resolve([]),
+      effectiveSettings.documentaryCount
+        ? discoverBroadly('movie', {
+            with_watch_providers: providerQuery,
+            with_genres: '99',
+            'primary_release_date.gte': earliest,
+            'vote_count.gte': '300',
+            'vote_average.gte': '6.6',
+          }, effectiveSettings.providerIds, `${refreshToken}:documentary`)
+        : Promise.resolve([]),
+      Promise.all(
+        favorites
+          .filter((item) => (item.mediaType || 'movie') === 'movie')
+          .slice(0, 3)
+          .map((item) => getTitleRecommendations('movie', item.tmdbMovieId)),
+      ).then((rows) => rows.flat()),
+      Promise.all(
+        favorites
+          .filter((item) => item.mediaType === 'tv')
+          .slice(0, 3)
+          .map((item) => getTitleRecommendations('tv', item.tmdbMovieId)),
+      ).then((rows) => rows.flat()),
+    ]);
 
-  const rankedPool = [
-    ...rankRecommendations({
-      candidates: moviesMerged.candidates,
-      kind: 'movie',
-      count: movieFetchCount,
-      watchedIds: movieSuppressed,
-      settings: effectiveSettings,
-      seed,
-      intent,
-      seedBoosts: moviesMerged.boosts,
-      softAvoidGenreIds,
-    }),
-    ...rankRecommendations({
-      candidates: showsMerged.candidates,
-      kind: 'show',
-      count: showFetchCount,
-      watchedIds: showSuppressed,
-      settings: effectiveSettings,
-      seed,
-      intent,
-      seedBoosts: showsMerged.boosts,
-      softAvoidGenreIds,
-    }),
-    ...rankRecommendations({
-      candidates: documentaries,
-      kind: 'documentary',
-      count: docFetchCount,
-      watchedIds: movieSuppressed,
-      settings: effectiveSettings,
-      seed: `${seed}:doc`,
-      intent,
-      softAvoidGenreIds,
-    }),
-  ];
+    const moviesMerged = mergeSeedCandidates(moviesRaw, movieSeeds);
+    const showsMerged = mergeSeedCandidates(showsRaw, showSeeds);
 
-  const finalized = await finalizePicks(
-    rankedPool,
-    effectiveSettings,
-    [effectiveSettings.tasteNote, generation.data.sessionRequest].filter(Boolean).join(' — '),
-    {
-      movie: effectiveSettings.movieCount,
-      show: effectiveSettings.showCount,
-      documentary: effectiveSettings.documentaryCount,
-    },
-  );
+    const history = new Set(
+      (profile as { recommendationHistory?: string[] } | null)?.recommendationHistory || [],
+    );
+    const movieSuppressed = new Set([
+      ...watchedMovieIds,
+      ...[...history].filter((key) => key.startsWith('movie:')).map((key) => Number(key.slice(6))),
+    ]);
+    const showSuppressed = new Set([
+      ...watchedShowIds,
+      ...[...history].filter((key) => key.startsWith('tv:')).map((key) => Number(key.slice(3))),
+    ]);
+    const seed = `${session.user.id}:${refreshToken}:${JSON.stringify(effectiveSettings)}:${generation.data.sessionRequest}`;
 
-  const items = [
-    ...finalized.filter((item) => item.kind === 'movie').slice(0, effectiveSettings.movieCount),
-    ...finalized.filter((item) => item.kind === 'show').slice(0, effectiveSettings.showCount),
-    ...finalized.filter((item) => item.kind === 'documentary').slice(0, effectiveSettings.documentaryCount),
-  ];
+    const rankedPool = [
+      ...rankRecommendations({
+        candidates: moviesMerged.candidates,
+        kind: 'movie',
+        count: movieFetchCount,
+        watchedIds: movieSuppressed,
+        settings: effectiveSettings,
+        seed,
+        intent,
+        seedBoosts: moviesMerged.boosts,
+        softAvoidGenreIds,
+      }),
+      ...rankRecommendations({
+        candidates: showsMerged.candidates,
+        kind: 'show',
+        count: showFetchCount,
+        watchedIds: showSuppressed,
+        settings: effectiveSettings,
+        seed,
+        intent,
+        seedBoosts: showsMerged.boosts,
+        softAvoidGenreIds,
+      }),
+      ...rankRecommendations({
+        candidates: documentaries,
+        kind: 'documentary',
+        count: docFetchCount,
+        watchedIds: movieSuppressed,
+        settings: effectiveSettings,
+        seed: `${seed}:doc`,
+        intent,
+        softAvoidGenreIds,
+      }),
+    ];
 
-  const generatedAt = new Date();
-  if (items.length) {
-    await Profile.updateOne(
-      { userId: session.user.id },
+    const finalized = await finalizePicks(
+      rankedPool,
+      effectiveSettings,
+      [effectiveSettings.tasteNote, generation.data.sessionRequest].filter(Boolean).join(' — '),
       {
-        $set: { lastPicksGeneratedAt: generatedAt },
-        $push: {
-          recommendationHistory: {
-            $each: items.map((item) => `${item.mediaType}:${item.id}`),
-            $slice: -80,
-          },
-        },
+        movie: effectiveSettings.movieCount,
+        show: effectiveSettings.showCount,
+        documentary: effectiveSettings.documentaryCount,
       },
     );
-  }
 
-  return NextResponse.json({
-    settings: effectiveSettings,
-    items,
-    generatedAt: generatedAt.toISOString(),
-  });
+    const items = [
+      ...finalized.filter((item) => item.kind === 'movie').slice(0, effectiveSettings.movieCount),
+      ...finalized.filter((item) => item.kind === 'show').slice(0, effectiveSettings.showCount),
+      ...finalized.filter((item) => item.kind === 'documentary').slice(0, effectiveSettings.documentaryCount),
+    ];
+
+    const generatedAt = new Date();
+    if (items.length) {
+      await Profile.updateOne(
+        { userId: session.user.id },
+        {
+          $set: { lastPicksGeneratedAt: generatedAt },
+          $push: {
+            recommendationHistory: {
+              $each: items.map((item) => `${item.mediaType}:${item.id}`),
+              $slice: -80,
+            },
+          },
+        },
+      );
+    }
+
+    return NextResponse.json({
+      settings: effectiveSettings,
+      items,
+      generatedAt: generatedAt.toISOString(),
+    });
+  } catch (error) {
+    console.error('POST /api/recommendations failed', error);
+    const message = error instanceof Error ? error.message : 'Could not build picks right now.';
+    const friendly = /pattern|uuid|regex|invalid/i.test(message)
+      ? 'Something went wrong building picks. Try again — if it keeps failing, open Settings and save your streaming services once.'
+      : message;
+    return NextResponse.json({ error: friendly }, { status: 500 });
+  }
 }
 
 export async function PUT(request: Request) {

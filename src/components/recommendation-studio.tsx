@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   Globe2,
@@ -16,6 +16,7 @@ import {
 import LibraryActions from '@/components/library-actions';
 import FamilyTakes from '@/components/family-takes';
 import { useLibrary } from '@/components/library-provider';
+import { createRequestId } from '@/lib/id';
 import {
   DEFAULT_PICK_SETTINGS,
   STREAMING_SERVICES,
@@ -189,7 +190,6 @@ export default function RecommendationStudio() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [weeklyHint, setWeeklyHint] = useState(false);
-  const createPicksRef = useRef<() => Promise<void>>(async () => undefined);
 
   const createPicks = useCallback(async () => {
     setCreating(true);
@@ -198,13 +198,18 @@ export default function RecommendationStudio() {
     try {
       const response = await fetch('/api/recommendations', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionRequest: sessionNote.trim(),
-          refreshToken: crypto.randomUUID(),
+          refreshToken: createRequestId(),
         }),
       });
       const body = await response.json() as PicksResponse & { error?: string };
+      if (response.status === 401) {
+        setError('Your session expired. Sign in once with your email + PIN, then try Recommend Now again.');
+        return;
+      }
       if (!response.ok) throw new Error(body.error || 'MovieChoice could not create your picks.');
       if (!body.items?.length) {
         setPicks(body);
@@ -213,19 +218,23 @@ export default function RecommendationStudio() {
       }
       setPicks(body);
       setHiddenKeys(new Set());
-      requestAnimationFrame(() => document.querySelector('#your-picks')?.scrollIntoView({ behavior: 'smooth' }));
+      setNeedsOnboarding(false);
+      requestAnimationFrame(() => document.getElementById('your-picks')?.scrollIntoView({ behavior: 'smooth' }));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'MovieChoice could not create your picks. Check your connection and try again.');
+      const raw = caught instanceof Error ? caught.message : '';
+      setError(
+        /pattern|uuid|regex|invalid/i.test(raw)
+          ? 'Something went wrong building picks. Tap Recommend Now again — if it keeps failing, open Settings and save your streaming services once.'
+          : raw || 'MovieChoice could not create your picks. Check your connection and try again.',
+      );
     } finally {
       setCreating(false);
     }
   }, [sessionNote]);
 
-  createPicksRef.current = createPicks;
-
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/recommendations', { cache: 'no-store' })
+    fetch('/api/recommendations', { cache: 'no-store', credentials: 'include' })
       .then(async (response) => {
         const body = await response.json().catch(() => ({})) as {
           settings?: PickSettings;
@@ -234,16 +243,13 @@ export default function RecommendationStudio() {
           needsOnboarding?: boolean;
         };
         if (cancelled) return;
-        setSettings(normalizePickSettings(body.settings || DEFAULT_PICK_SETTINGS));
-        setNeedsOnboarding(Boolean(body.needsOnboarding));
+        const nextSettings = normalizePickSettings(body.settings || DEFAULT_PICK_SETTINGS);
+        setSettings(nextSettings);
+        // Never show setup banner when streaming services are already chosen.
+        setNeedsOnboarding(Boolean(body.needsOnboarding) && nextSettings.providerIds.length === 0);
         setWeeklyHint(Boolean(body.needsWeeklyRefresh));
         if (!response.ok && response.status === 401) {
-          setError('Please sign in again to load your saved settings.');
-        }
-        if (body.needsWeeklyRefresh) {
-          window.setTimeout(() => {
-            if (!cancelled) void createPicksRef.current();
-          }, 250);
+          setError('Your session expired. Sign in once with your email + PIN to continue.');
         }
       })
       .catch(() => {
@@ -263,6 +269,7 @@ export default function RecommendationStudio() {
     setMenuOpen(false);
     const response = await fetch('/api/recommendations', {
       method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clearHistory: true }),
     });
@@ -346,7 +353,15 @@ export default function RecommendationStudio() {
         {weeklyHint ? (
           <div className="mb-5 rounded-[1.5rem] border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950">
             <p className="font-bold">New Friday picks are ready</p>
-            <p className="mt-1 text-violet-800/90">Refreshing your Movies & Shows shortlist for this week…</p>
+            <p className="mt-1 text-violet-800/90">Tap Recommend Now when you want this week’s Movies & Shows shortlist.</p>
+            <button
+              type="button"
+              onClick={createPicks}
+              disabled={creating || loading || settings.providerIds.length === 0}
+              className="mt-3 inline-flex rounded-full bg-violet-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+            >
+              Refresh for this week
+            </button>
           </div>
         ) : null}
         <section className="rounded-[1.75rem] border border-violet-100 bg-white/80 p-5 shadow-[0_18px_50px_-30px_rgba(91,33,182,0.45)] backdrop-blur sm:p-6">

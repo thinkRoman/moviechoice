@@ -66,7 +66,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${outfit.variable} ${fraunces.variable} font-sans antialiased touch-manipulation`}>
-        <SessionProvider>
+        <SessionProvider refetchOnWindowFocus refetchWhenOffline={false}>
           <LibraryProvider>
             {children}
             <PwaRegister />
