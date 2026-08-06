@@ -250,7 +250,7 @@ export default function RecommendationStudio() {
             MC
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-black tracking-tight text-zinc-950">MovieChoice Picks</p>
+            <p className="truncate text-base font-black tracking-tight text-zinc-950">Movies &amp; Shows Picks</p>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-violet-500">Week of {weekLabel()}</p>
           </div>
           <button
