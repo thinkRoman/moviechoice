@@ -110,7 +110,7 @@ function LibrarySection({
 
 export default async function MyMoviesPage() {
   const session = await auth();
-  if (!session?.user?.id) redirect('/signin');
+  if (!session?.user?.id) redirect('/signin?callbackUrl=/my-movies');
 
   const items = await listLibrary(session.user.id, movieLibraryRepository);
   const watchlist = items.filter((item) => item.inWatchlist);
