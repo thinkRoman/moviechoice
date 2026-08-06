@@ -6,8 +6,11 @@ import dbConnect from '@/lib/mongodb';
 import { discoverTitles, enrichDiscoverTitle } from '@/lib/tmdb';
 import {
   DEFAULT_PICK_SETTINGS,
+  MAX_GENRES,
+  MAX_STREAMING_SERVICES,
   interpretSessionRequest,
   mergeIntents,
+  normalizePickSettings,
   rankRecommendations,
   type PickSettings,
   type RecommendedTitle,
@@ -17,8 +20,8 @@ import UserMovie from '@/models/UserMovie';
 import { ensureUserProfile } from '@/lib/user-profile';
 
 const settingsSchema = z.object({
-  providerIds: z.array(z.number().int().positive()).min(1).max(8),
-  genreIds: z.array(z.number().int().positive()).max(10),
+  providerIds: z.array(z.number().int().positive()).min(1).max(MAX_STREAMING_SERVICES),
+  genreIds: z.array(z.number().int().positive()).max(MAX_GENRES),
   tasteNote: z.string().trim().max(240),
   yearsBack: z.number().int().min(1).max(30),
   movieCount: z.number().int().min(0).max(10),
@@ -31,8 +34,8 @@ const settingsSchema = z.object({
 });
 
 const sessionOverridesSchema = z.object({
-  providerIds: z.array(z.number().int().positive()).min(1).max(8).optional(),
-  genreIds: z.array(z.number().int().positive()).max(10).optional(),
+  providerIds: z.array(z.number().int().positive()).min(1).max(MAX_STREAMING_SERVICES).optional(),
+  genreIds: z.array(z.number().int().positive()).max(MAX_GENRES).optional(),
   tasteNote: z.string().trim().max(240).optional(),
   yearsBack: z.number().int().min(1).max(30).optional(),
   movieCount: z.number().int().min(0).max(10).optional(),
@@ -135,16 +138,30 @@ async function finalizePicks(
 export function profileSettings(profile: unknown): PickSettings {
   const stored = (profile as { preferences?: { recommendation?: Partial<PickSettings> } } | null)
     ?.preferences?.recommendation;
-  return { ...DEFAULT_PICK_SETTINGS, ...stored };
+  return normalizePickSettings({ ...DEFAULT_PICK_SETTINGS, ...stored });
 }
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  await dbConnect();
-  await ensureUserProfile(session.user.id, session.user.name || 'Movie lover');
-  const profile = await Profile.findOne({ userId: session.user.id }).lean();
-  return NextResponse.json({ settings: profileSettings(profile) });
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized', settings: DEFAULT_PICK_SETTINGS }, { status: 401 });
+    }
+
+    let profile = null;
+    try {
+      await dbConnect();
+      await ensureUserProfile(session.user.id, session.user.name || 'Movie lover');
+      profile = await Profile.findOne({ userId: session.user.id }).lean();
+    } catch (error) {
+      console.error('Failed to load recommendation settings profile', error);
+    }
+
+    return NextResponse.json({ settings: profileSettings(profile) });
+  } catch (error) {
+    console.error('GET /api/recommendations failed', error);
+    return NextResponse.json({ settings: DEFAULT_PICK_SETTINGS, error: 'Could not load settings' }, { status: 200 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -305,25 +322,34 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const parsed = settingsSchema.safeParse(await request.json().catch(() => null));
+  const parsed = settingsSchema.safeParse(normalizePickSettings(await request.json().catch(() => null)));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid settings' }, { status: 400 });
   }
 
-  await dbConnect();
-  await Profile.findOneAndUpdate(
-    { userId: session.user.id },
-    {
-      $set: { 'preferences.recommendation': parsed.data },
-      $setOnInsert: {
-        name: session.user.name || 'Movie lover',
-        'preferences.genres': [],
-        'preferences.streamingServices': [],
-        tasteSignals: { thumbsUp: [], thumbsDown: [], ratings: [] },
-        isPrimary: true,
+  try {
+    await dbConnect();
+    await ensureUserProfile(session.user.id, session.user.name || 'Movie lover');
+    await Profile.findOneAndUpdate(
+      { userId: session.user.id },
+      {
+        $set: {
+          name: session.user.name || 'Movie lover',
+          'preferences.recommendation': parsed.data,
+        },
+        $setOnInsert: {
+          'preferences.genres': [],
+          'preferences.streamingServices': [],
+          tasteSignals: { thumbsUp: [], thumbsDown: [], ratings: [] },
+          recommendationHistory: [],
+          isPrimary: true,
+        },
       },
-    },
-    { upsert: true, new: true },
-  );
-  return NextResponse.json({ settings: parsed.data });
+      { upsert: true, new: true },
+    );
+    return NextResponse.json({ settings: parsed.data });
+  } catch (error) {
+    console.error('PUT /api/recommendations failed', error);
+    return NextResponse.json({ error: 'Could not save settings' }, { status: 500 });
+  }
 }

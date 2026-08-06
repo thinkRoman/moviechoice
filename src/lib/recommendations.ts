@@ -1,27 +1,71 @@
 import type { DiscoverTitle } from '@/lib/tmdb';
 
+/** Popular US subscription services shown first in Settings. */
 export const STREAMING_SERVICES = [
-  { id: 8, name: 'Netflix' },
-  { id: 9, name: 'Prime Video' },
-  { id: 337, name: 'Disney+' },
-  { id: 1899, name: 'Max' },
-  { id: 15, name: 'Hulu' },
-  { id: 350, name: 'Apple TV+' },
-  { id: 531, name: 'Paramount+' },
-  { id: 386, name: 'Peacock' },
+  { id: 8, name: 'Netflix', popular: true },
+  { id: 9, name: 'Prime Video', popular: true },
+  { id: 337, name: 'Disney+', popular: true },
+  { id: 1899, name: 'Max', popular: true },
+  { id: 15, name: 'Hulu', popular: true },
+  { id: 350, name: 'Apple TV+', popular: true },
+  { id: 531, name: 'Paramount+', popular: true },
+  { id: 386, name: 'Peacock', popular: true },
+  { id: 387, name: 'Peacock Premium Plus' },
+  { id: 43, name: 'Starz' },
+  { id: 526, name: 'AMC+' },
+  { id: 34, name: 'MGM+' },
+  { id: 257, name: 'fuboTV' },
+  { id: 151, name: 'BritBox' },
+  { id: 37, name: 'Showtime' },
+  { id: 283, name: 'Crunchyroll' },
+  { id: 520, name: 'Discovery+' },
+  { id: 258, name: 'Criterion Channel' },
+  { id: 99, name: 'Shudder' },
+  { id: 188, name: 'YouTube Premium' },
+  { id: 73, name: 'Tubi' },
+  { id: 207, name: 'The Roku Channel' },
+  { id: 300, name: 'Pluto TV' },
+  { id: 613, name: 'Freevee' },
+  { id: 538, name: 'Plex' },
+  { id: 11, name: 'MUBI' },
+  { id: 123, name: 'FXNow' },
+  { id: 185, name: 'Screambox' },
+  { id: 289, name: 'Kanopy' },
 ] as const;
 
+/** Core affinities shown first; more TMDB genres available via “Add genres”. */
 export const PICK_GENRES = [
-  { id: 28, name: 'Action' },
-  { id: 35, name: 'Comedy' },
-  { id: 18, name: 'Drama' },
-  { id: 27, name: 'Horror' },
-  { id: 9648, name: 'Mystery' },
-  { id: 10749, name: 'Romance' },
-  { id: 878, name: 'Science Fiction' },
-  { id: 53, name: 'Thriller' },
-  { id: 99, name: 'Documentary' },
+  { id: 28, name: 'Action', popular: true },
+  { id: 35, name: 'Comedy', popular: true },
+  { id: 18, name: 'Drama', popular: true },
+  { id: 27, name: 'Horror', popular: true },
+  { id: 9648, name: 'Mystery', popular: true },
+  { id: 10749, name: 'Romance', popular: true },
+  { id: 878, name: 'Science Fiction', popular: true },
+  { id: 53, name: 'Thriller', popular: true },
+  { id: 99, name: 'Documentary', popular: true },
+  { id: 12, name: 'Adventure' },
+  { id: 16, name: 'Animation' },
+  { id: 80, name: 'Crime' },
+  { id: 10751, name: 'Family' },
+  { id: 14, name: 'Fantasy' },
+  { id: 36, name: 'History' },
+  { id: 10402, name: 'Music' },
+  { id: 10770, name: 'TV Movie' },
+  { id: 10752, name: 'War' },
+  { id: 37, name: 'Western' },
+  { id: 10759, name: 'Action & Adventure' },
+  { id: 10762, name: 'Kids' },
+  { id: 10763, name: 'News' },
+  { id: 10764, name: 'Reality' },
+  { id: 10765, name: 'Sci-Fi & Fantasy' },
+  { id: 10766, name: 'Soap' },
+  { id: 10767, name: 'Talk' },
+  { id: 10768, name: 'War & Politics' },
 ] as const;
+
+export const MAX_STREAMING_SERVICES = 20;
+export const MAX_GENRES = 20;
 
 export interface PickSettings {
   providerIds: number[];
@@ -71,6 +115,63 @@ export const DEFAULT_PICK_SETTINGS: PickSettings = {
   includeInternational: true,
   weeklyRefresh: false,
 };
+
+const KNOWN_PROVIDER_IDS = new Set<number>(STREAMING_SERVICES.map((service) => service.id));
+const KNOWN_GENRE_IDS = new Set<number>(PICK_GENRES.map((genre) => genre.id));
+
+function asNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => Number(entry))
+    .filter((entry) => Number.isInteger(entry) && entry > 0);
+}
+
+/** Normalize stored settings so Settings / Picks never crash on partial or legacy data. */
+export function normalizePickSettings(raw: unknown): PickSettings {
+  const stored = (raw && typeof raw === 'object' ? raw : {}) as Partial<PickSettings>;
+  const providerIds = asNumberArray(stored.providerIds)
+    .filter((id) => KNOWN_PROVIDER_IDS.has(id))
+    .slice(0, MAX_STREAMING_SERVICES);
+  const genreIds = asNumberArray(stored.genreIds)
+    .filter((id) => KNOWN_GENRE_IDS.has(id))
+    .slice(0, MAX_GENRES);
+
+  const movieCount = Number.isFinite(stored.movieCount)
+    ? Math.min(10, Math.max(0, Number(stored.movieCount)))
+    : DEFAULT_PICK_SETTINGS.movieCount;
+  const showCount = Number.isFinite(stored.showCount)
+    ? Math.min(10, Math.max(0, Number(stored.showCount)))
+    : DEFAULT_PICK_SETTINGS.showCount;
+  const documentaryCount = Number.isFinite(stored.documentaryCount)
+    ? Math.min(10, Math.max(0, Number(stored.documentaryCount)))
+    : DEFAULT_PICK_SETTINGS.documentaryCount;
+  const yearsBack = Number.isFinite(stored.yearsBack)
+    ? Math.min(30, Math.max(1, Number(stored.yearsBack)))
+    : DEFAULT_PICK_SETTINGS.yearsBack;
+
+  const normalized: PickSettings = {
+    providerIds: providerIds.length ? providerIds : [...DEFAULT_PICK_SETTINGS.providerIds],
+    genreIds: genreIds.length ? genreIds : [...DEFAULT_PICK_SETTINGS.genreIds],
+    tasteNote: typeof stored.tasteNote === 'string' ? stored.tasteNote.slice(0, 240) : '',
+    yearsBack,
+    movieCount,
+    showCount,
+    documentaryCount,
+    includeInternational: typeof stored.includeInternational === 'boolean'
+      ? stored.includeInternational
+      : DEFAULT_PICK_SETTINGS.includeInternational,
+    weeklyRefresh: typeof stored.weeklyRefresh === 'boolean'
+      ? stored.weeklyRefresh
+      : DEFAULT_PICK_SETTINGS.weeklyRefresh,
+  };
+
+  if (normalized.movieCount + normalized.showCount + normalized.documentaryCount === 0) {
+    normalized.movieCount = DEFAULT_PICK_SETTINGS.movieCount;
+    normalized.showCount = DEFAULT_PICK_SETTINGS.showCount;
+  }
+
+  return normalized;
+}
 
 export function formatRuntime(minutes: number | null | undefined): string | null {
   if (!minutes || minutes <= 0) return null;

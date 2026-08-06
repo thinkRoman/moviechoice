@@ -5,18 +5,22 @@ import { useEffect, useState } from 'react';
 import { Check, LoaderCircle, Save, Sparkles, UserPlus } from 'lucide-react';
 import {
   DEFAULT_PICK_SETTINGS,
+  MAX_GENRES,
+  MAX_STREAMING_SERVICES,
   PICK_GENRES,
   STREAMING_SERVICES,
+  normalizePickSettings,
   type PickSettings,
 } from '@/lib/recommendations';
 
-function Chip({ active, label, onClick }: { active: boolean; label: string; onClick(): void }) {
+function Chip({ active, label, onClick, disabled = false }: { active: boolean; label: string; onClick(): void; disabled?: boolean }) {
   return (
     <button
       type="button"
       aria-pressed={active}
+      disabled={disabled}
       onClick={onClick}
-      className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+      className={`rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
         active
           ? 'border-violet-400/60 bg-violet-500/20 text-violet-100'
           : 'border-white/10 bg-white/[0.035] text-zinc-400 hover:border-white/20 hover:text-white'
@@ -58,38 +62,77 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [showMoreServices, setShowMoreServices] = useState(false);
+  const [showMoreGenres, setShowMoreGenres] = useState(false);
+
+  const popularServices = STREAMING_SERVICES.filter((service) => 'popular' in service && service.popular);
+  const moreServices = STREAMING_SERVICES.filter((service) => !('popular' in service && service.popular));
+  const popularGenres = PICK_GENRES.filter((genre) => 'popular' in genre && genre.popular);
+  const moreGenres = PICK_GENRES.filter((genre) => !('popular' in genre && genre.popular));
 
   useEffect(() => {
+    let cancelled = false;
     fetch('/api/recommendations', { cache: 'no-store' })
       .then(async (response) => {
-        const body = await response.json() as { settings?: PickSettings; error?: string };
-        if (!response.ok || !body.settings) throw new Error(body.error || 'Could not load settings.');
-        setSettings(body.settings);
+        const body = await response.json().catch(() => ({})) as { settings?: PickSettings; error?: string };
+        const next = normalizePickSettings(body.settings || DEFAULT_PICK_SETTINGS);
+        if (!cancelled) {
+          setSettings(next);
+          if (!response.ok && response.status !== 200) {
+            setMessage(body.error || 'Showing default settings. Save once to personalize.');
+          }
+          if (next.providerIds.some((id) => moreServices.some((service) => service.id === id))) {
+            setShowMoreServices(true);
+          }
+          if (next.genreIds.some((id) => moreGenres.some((genre) => genre.id === id))) {
+            setShowMoreGenres(true);
+          }
+        }
       })
-      .catch((error: Error) => setMessage(error.message))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!cancelled) {
+          setSettings(DEFAULT_PICK_SETTINGS);
+          setMessage('Could not reach saved settings. Defaults are shown — save when ready.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function toggle(key: 'providerIds' | 'genreIds', id: number) {
-    setSettings((current) => ({
-      ...current,
-      [key]: current[key].includes(id)
-        ? current[key].filter((value) => value !== id)
-        : [...current[key], id],
-    }));
+    setSettings((current) => {
+      const limit = key === 'providerIds' ? MAX_STREAMING_SERVICES : MAX_GENRES;
+      const selected = current[key];
+      if (selected.includes(id)) {
+        return { ...current, [key]: selected.filter((value) => value !== id) };
+      }
+      if (selected.length >= limit) {
+        setMessage(key === 'providerIds'
+          ? `You can choose up to ${MAX_STREAMING_SERVICES} streaming services.`
+          : `You can choose up to ${MAX_GENRES} genres.`);
+        return current;
+      }
+      return { ...current, [key]: [...selected, id] };
+    });
   }
 
   async function save() {
     setSaving(true);
     setMessage('');
     try {
+      const payload = normalizePickSettings(settings);
       const response = await fetch('/api/recommendations', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       });
-      const body = await response.json() as { error?: string };
+      const body = await response.json() as { error?: string; settings?: PickSettings };
       if (!response.ok) throw new Error(body.error || 'Could not save settings.');
+      setSettings(normalizePickSettings(body.settings || payload));
       setMessage('Saved. Future recommendations will use these preferences.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not save settings.');
@@ -97,6 +140,14 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
       setSaving(false);
     }
   }
+
+  const visibleServices = showMoreServices ? STREAMING_SERVICES : popularServices;
+  const visibleGenres = showMoreGenres
+    ? PICK_GENRES
+    : [
+        ...popularGenres,
+        ...moreGenres.filter((genre) => settings.genreIds.includes(genre.id)),
+      ];
 
   return (
     <section className="mx-auto max-w-4xl px-4 pb-32 pt-24 sm:px-6 sm:pb-24 sm:pt-28">
@@ -135,18 +186,74 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
 
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
           <h2 className="text-xl font-black">Streaming services</h2>
-          <p className="mt-1 text-sm text-zinc-500">Recommendations only come from services you can watch.</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            US services you subscribe to. Pick up to {MAX_STREAMING_SERVICES}. Recommendations stay on these only.
+          </p>
           <div className="mt-5 flex flex-wrap gap-2">
-            {STREAMING_SERVICES.map((service) => <Chip key={service.id} active={settings.providerIds.includes(service.id)} label={service.name} onClick={() => toggle('providerIds', service.id)} />)}
+            {visibleServices.map((service) => (
+              <Chip
+                key={service.id}
+                active={settings.providerIds.includes(service.id)}
+                label={service.name}
+                disabled={!settings.providerIds.includes(service.id) && settings.providerIds.length >= MAX_STREAMING_SERVICES}
+                onClick={() => toggle('providerIds', service.id)}
+              />
+            ))}
           </div>
+          {!showMoreServices && moreServices.length ? (
+            <button
+              type="button"
+              onClick={() => setShowMoreServices(true)}
+              className="mt-4 text-sm font-semibold text-violet-300 hover:text-white"
+            >
+              + Add more US streaming services ({moreServices.length})
+            </button>
+          ) : null}
+          {showMoreServices ? (
+            <button
+              type="button"
+              onClick={() => setShowMoreServices(false)}
+              className="mt-4 text-sm font-semibold text-zinc-500 hover:text-white"
+            >
+              Show fewer services
+            </button>
+          ) : null}
         </section>
 
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
           <h2 className="text-xl font-black">Genres</h2>
-          <p className="mt-1 text-sm text-zinc-500">These are affinities, not a filter you need to repeat each time.</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            Affinities for picks — add more as you go (up to {MAX_GENRES}).
+          </p>
           <div className="mt-5 flex flex-wrap gap-2">
-            {PICK_GENRES.map((genre) => <Chip key={genre.id} active={settings.genreIds.includes(genre.id)} label={genre.name} onClick={() => toggle('genreIds', genre.id)} />)}
+            {visibleGenres.map((genre) => (
+              <Chip
+                key={genre.id}
+                active={settings.genreIds.includes(genre.id)}
+                label={genre.name}
+                disabled={!settings.genreIds.includes(genre.id) && settings.genreIds.length >= MAX_GENRES}
+                onClick={() => toggle('genreIds', genre.id)}
+              />
+            ))}
           </div>
+          {!showMoreGenres && moreGenres.length ? (
+            <button
+              type="button"
+              onClick={() => setShowMoreGenres(true)}
+              className="mt-4 text-sm font-semibold text-violet-300 hover:text-white"
+            >
+              + Add more genres ({moreGenres.length})
+            </button>
+          ) : null}
+          {showMoreGenres ? (
+            <button
+              type="button"
+              onClick={() => setShowMoreGenres(false)}
+              className="mt-4 text-sm font-semibold text-zinc-500 hover:text-white"
+            >
+              Show fewer genres
+            </button>
+          ) : null}
           <label className="mt-6 flex items-center gap-3 text-sm font-semibold text-zinc-300">
             <input type="checkbox" checked={settings.includeInternational} onChange={(event) => setSettings({ ...settings, includeInternational: event.target.checked })} className="h-5 w-5 accent-violet-500" />
             Include international titles

@@ -19,6 +19,7 @@ import {
   DEFAULT_PICK_SETTINGS,
   STREAMING_SERVICES,
   formatRuntime,
+  normalizePickSettings,
   type PickSettings,
   type RecommendedTitle,
 } from '@/lib/recommendations';
@@ -186,11 +187,16 @@ export default function RecommendationStudio() {
   useEffect(() => {
     fetch('/api/recommendations', { cache: 'no-store' })
       .then(async (response) => {
-        if (!response.ok) throw new Error();
-        const body = await response.json() as { settings: PickSettings };
-        setSettings(body.settings);
+        const body = await response.json().catch(() => ({})) as { settings?: PickSettings; error?: string };
+        setSettings(normalizePickSettings(body.settings || DEFAULT_PICK_SETTINGS));
+        if (!response.ok && response.status === 401) {
+          setError('Please sign in again to load your saved settings.');
+        }
       })
-      .catch(() => setError('Your saved settings could not be loaded. Please try again.'))
+      .catch(() => {
+        setSettings(DEFAULT_PICK_SETTINGS);
+        setError('Using default settings for now. Open Settings to personalize, then try again.');
+      })
       .finally(() => setLoading(false));
   }, []);
 
