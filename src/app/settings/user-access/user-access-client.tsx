@@ -73,7 +73,9 @@ export default function UserAccessClient() {
           <ArrowLeft className="h-4 w-4" /> Settings
         </Link>
         <h1 className="text-3xl font-bold">User Access</h1>
-        <p className="mt-1 text-sm text-gray-500">Invite and manage MovieChoice members.</p>
+        <p className="mt-1 text-sm text-gray-500">
+          Invite people with a PIN. Each member gets their own picks, watched list, and settings.
+        </p>
 
         <form onSubmit={addUser} className="mt-7 grid gap-3 rounded-2xl border bg-white p-5 dark:border-gray-800 dark:bg-[#18181b] sm:grid-cols-2">
           <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" className="rounded-xl border bg-gray-50 px-4 py-3 text-sm dark:border-gray-700 dark:bg-gray-800" />

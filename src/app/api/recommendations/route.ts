@@ -14,6 +14,7 @@ import {
 } from '@/lib/recommendations';
 import Profile from '@/models/Profile';
 import UserMovie from '@/models/UserMovie';
+import { ensureUserProfile } from '@/lib/user-profile';
 
 const settingsSchema = z.object({
   providerIds: z.array(z.number().int().positive()).min(1).max(8),
@@ -141,6 +142,7 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   await dbConnect();
+  await ensureUserProfile(session.user.id, session.user.name || 'Movie lover');
   const profile = await Profile.findOne({ userId: session.user.id }).lean();
   return NextResponse.json({ settings: profileSettings(profile) });
 }
@@ -154,6 +156,7 @@ export async function POST(request: Request) {
   }
 
   await dbConnect();
+  await ensureUserProfile(session.user.id, session.user.name || 'Movie lover');
   const profile = await Profile.findOne({ userId: session.user.id }).lean();
   const settings = { ...profileSettings(profile), ...generation.data.overrides };
   const parsed = settingsSchema.safeParse(settings);
