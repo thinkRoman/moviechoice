@@ -169,7 +169,7 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
             {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? 'Saving…' : 'Save settings'}
           </button>
-          <Link href="/for-you" className="px-5 py-3 text-center text-sm font-semibold text-zinc-400 hover:text-white">Back to recommendations</Link>
+          <Link href="/for-you" className="px-5 py-3 text-center text-sm font-semibold text-zinc-400 hover:text-white">Back to Picks</Link>
         </div>
         {message ? <p role="status" className="text-center text-sm text-zinc-300">{message}</p> : null}
       </div>
