@@ -1,12 +1,18 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Fraunces, Outfit } from 'next/font/google';
 import { SessionProvider } from 'next-auth/react';
 import { LibraryProvider } from '@/components/library-provider';
 
-const inter = Inter({
+const outfit = Outfit({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-serif',
   display: 'swap',
 });
 
@@ -31,7 +37,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${outfit.variable} ${fraunces.variable} font-sans antialiased`}>
         <SessionProvider>
           <LibraryProvider>{children}</LibraryProvider>
         </SessionProvider>

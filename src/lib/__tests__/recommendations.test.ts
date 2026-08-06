@@ -24,6 +24,7 @@ function candidate(overrides: Partial<DiscoverTitle> = {}): DiscoverTitle {
     popularity: 20,
     genreIds: [18],
     international: false,
+    originalLanguage: 'en',
     ...overrides,
   };
 }
