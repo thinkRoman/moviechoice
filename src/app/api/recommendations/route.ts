@@ -80,12 +80,16 @@ async function discoverBroadly(
     providerId,
   }));
   const lanes = [
-    ...broadLanes.map((lane) => discoverTitles(mediaType, { ...params, sort_by: lane.sort_by }, lane.page)),
-    ...providerLanes.map((lane) => discoverTitles(mediaType, {
-      ...params,
-      with_watch_providers: String(lane.providerId),
-      sort_by: lane.sort_by,
-    }, lane.page)),
+    ...broadLanes.map((lane) =>
+      discoverTitles(mediaType, { ...params, sort_by: lane.sort_by }, lane.page).catch(() => []),
+    ),
+    ...providerLanes.map((lane) =>
+      discoverTitles(mediaType, {
+        ...params,
+        with_watch_providers: String(lane.providerId),
+        sort_by: lane.sort_by,
+      }, lane.page).catch(() => []),
+    ),
   ];
   return Promise.all(lanes).then((results) => results.flat());
 }
@@ -299,13 +303,13 @@ export async function POST(request: Request) {
         favorites
           .filter((item) => (item.mediaType || 'movie') === 'movie')
           .slice(0, 3)
-          .map((item) => getTitleRecommendations('movie', item.tmdbMovieId)),
+          .map((item) => getTitleRecommendations('movie', item.tmdbMovieId).catch(() => [])),
       ).then((rows) => rows.flat()),
       Promise.all(
         favorites
           .filter((item) => item.mediaType === 'tv')
           .slice(0, 3)
-          .map((item) => getTitleRecommendations('tv', item.tmdbMovieId)),
+          .map((item) => getTitleRecommendations('tv', item.tmdbMovieId).catch(() => [])),
       ).then((rows) => rows.flat()),
     ]);
 
@@ -401,8 +405,9 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('POST /api/recommendations failed', error);
     const message = error instanceof Error ? error.message : 'Could not build picks right now.';
-    const friendly = /pattern|uuid|regex|invalid/i.test(message)
-      ? 'Something went wrong building picks. Try again — if it keeps failing, open Settings and save your streaming services once.'
+    // Never hide the real failure behind a generic pattern message — that made debugging impossible.
+    const friendly = message === 'The string did not match the expected pattern.'
+      ? 'Could not build picks (request id / parsing glitch). Tap Recommend Now again.'
       : message;
     return NextResponse.json({ error: friendly }, { status: 500 });
   }

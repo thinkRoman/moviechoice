@@ -9,6 +9,7 @@ import { sendAccessPinEmail } from '@/lib/resend';
 const createSchema = z.object({
   name: z.string().trim().min(1).max(100),
   email: z.string().email().transform(normalizeEmail),
+  pin: z.string().regex(/^\d{6}$/, 'PIN must be exactly 6 digits'),
   monthlyAiLimitUsd: z.number().min(0).max(10000).optional(),
 });
 

@@ -99,13 +99,13 @@ export function requireOwner(role?: UserRole): void {
 
 export async function createMember(
   role: UserRole | undefined,
-  input: { name: string; email: string; monthlyAiLimitUsd?: number },
+  input: { name: string; email: string; pin?: string; monthlyAiLimitUsd?: number },
   repository: MemberRepository,
   sendInvitation: (input: { name: string; email: string; pin: string }) => Promise<void>,
 ): Promise<SafeAccessUser> {
   requireOwner(role);
   const email = normalizeEmail(input.email);
-  const pin = generatePin();
+  const pin = input.pin && /^\d{6}$/.test(input.pin) ? input.pin : generatePin();
   const { pinHash, pinSalt } = hashPin(pin);
   const user = await repository.create({
     name: input.name.trim(),

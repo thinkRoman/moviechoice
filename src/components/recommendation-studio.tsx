@@ -205,12 +205,15 @@ export default function RecommendationStudio() {
           refreshToken: createRequestId(),
         }),
       });
-      const body = await response.json() as PicksResponse & { error?: string };
+      const body = await response.json().catch(() => ({})) as PicksResponse & { error?: string };
       if (response.status === 401) {
         setError('Your session expired. Sign in once with your email + PIN, then try Recommend Now again.');
         return;
       }
-      if (!response.ok) throw new Error(body.error || 'MovieChoice could not create your picks.');
+      if (!response.ok) {
+        setError(body.error || 'MovieChoice could not create your picks.');
+        return;
+      }
       if (!body.items?.length) {
         setPicks(body);
         setError('No titles matched your services and filters. Try more streaming services or broader genres in Settings.');
@@ -220,13 +223,8 @@ export default function RecommendationStudio() {
       setHiddenKeys(new Set());
       setNeedsOnboarding(false);
       requestAnimationFrame(() => document.getElementById('your-picks')?.scrollIntoView({ behavior: 'smooth' }));
-    } catch (caught) {
-      const raw = caught instanceof Error ? caught.message : '';
-      setError(
-        /pattern|uuid|regex|invalid/i.test(raw)
-          ? 'Something went wrong building picks. Tap Recommend Now again — if it keeps failing, open Settings and save your streaming services once.'
-          : raw || 'MovieChoice could not create your picks. Check your connection and try again.',
-      );
+    } catch {
+      setError('MovieChoice could not create your picks. Check your connection and try again.');
     } finally {
       setCreating(false);
     }
@@ -245,8 +243,8 @@ export default function RecommendationStudio() {
         if (cancelled) return;
         const nextSettings = normalizePickSettings(body.settings || DEFAULT_PICK_SETTINGS);
         setSettings(nextSettings);
-        // Never show setup banner when streaming services are already chosen.
-        setNeedsOnboarding(Boolean(body.needsOnboarding) && nextSettings.providerIds.length === 0);
+        // Never show setup banner when streaming services are already chosen (including defaults).
+        setNeedsOnboarding(false);
         setWeeklyHint(Boolean(body.needsWeeklyRefresh));
         if (!response.ok && response.status === 401) {
           setError('Your session expired. Sign in once with your email + PIN to continue.');

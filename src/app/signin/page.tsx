@@ -97,13 +97,13 @@ function SignInForm() {
                 type="password"
                 inputMode="numeric"
                 autoComplete="current-password"
-                pattern="[0-9]{6}"
                 maxLength={6}
                 required
                 value={pin}
                 onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
                 className="w-full bg-transparent py-3 text-lg tracking-[0.35em] outline-none"
                 placeholder="••••••"
+                aria-invalid={pin.length > 0 && pin.length !== 6}
               />
             </span>
           </label>

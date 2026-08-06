@@ -94,15 +94,26 @@ describe('invite-only email and PIN access', () => {
   it('owner can create a member and the member PIN is hashed', async () => {
     const user = await createMember(
       'OWNER',
-      { name: 'Alex', email: ' Alex@Example.com ' },
+      { name: 'Alex', email: ' Alex@Example.com ', pin: '135791' },
       store.repository,
       sendInvitation,
     );
     const stored = store.credentials.get('alex@example.com');
     expect(user).toMatchObject({ email: 'alex@example.com', role: 'MEMBER' });
     expect(stored?.pinHash).toMatch(/^[a-f0-9]+$/);
+    expect(sentPins[0].pin).toBe('135791');
     expect(stored?.pinHash).not.toBe(sentPins[0].pin);
     expect(stored?.pinSalt).toBeTruthy();
+  });
+
+  it('auto-generates a PIN when none is provided', async () => {
+    await createMember(
+      'OWNER',
+      { name: 'Sam', email: 'sam@example.com' },
+      store.repository,
+      sendInvitation,
+    );
+    expect(sentPins[0].pin).toMatch(/^\d{6}$/);
   });
 
   it('unknown email fails', async () => {
