@@ -1,32 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { mongoConnectionOptions, resolveMongoDbName } from '@/lib/mongodb';
+import { resolveMongoDbName } from '@/lib/mongodb';
 
-describe('MongoDB env configuration', () => {
-  it('prefers MONGODB_DB over a database path in the URI', () => {
+describe('MongoDB URI-only configuration', () => {
+  it('uses the database path from MONGODB_URI', () => {
     expect(
       resolveMongoDbName(
-        'mongodb+srv://user:pass@cluster.mongodb.net/from-uri?retryWrites=true',
-        'moviechoice',
+        'mongodb+srv://user:pass@cluster.mongodb.net/moviechoice?retryWrites=true',
       ),
     ).toBe('moviechoice');
-  });
-
-  it('falls back to the URI path when MONGODB_DB is empty', () => {
-    expect(
-      resolveMongoDbName(
-        'mongodb+srv://user:pass@cluster.mongodb.net/from-uri?retryWrites=true',
-        '  ',
-      ),
-    ).toBe('from-uri');
-  });
-
-  it('passes dbName into mongoose connection options', () => {
-    expect(
-      mongoConnectionOptions(
-        'mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true',
-        'moviechoice',
-      ),
-    ).toMatchObject({ dbName: 'moviechoice' });
   });
 });
 

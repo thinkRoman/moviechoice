@@ -6,8 +6,7 @@ Set these in **Vercel → Project → Settings → Environment Variables**. Neve
 
 | Variable | Purpose |
 |----------|---------|
-| `MONGODB_URI` | MongoDB Atlas connection string — must start with `mongodb://` or `mongodb+srv://`. **Do not wrap in quotes** in Vercel. |
-| `MONGODB_DB` | Database name (e.g. `moviechoice`) |
+| `MONGODB_URI` | Full MongoDB Atlas connection string, including the database name in the path (e.g. `...mongodb.net/moviechoice?retryWrites=true&w=majority`). Must start with `mongodb://` or `mongodb+srv://`. **Do not wrap in quotes** in Vercel. **Do not use `MONGODB_DB`.** |
 | `NEXTAUTH_SECRET` / `AUTH_SECRET` | Random 32+ char secret |
 | `NEXTAUTH_URL` / `AUTH_URL` | Production URL (`https://your-domain`) |
 | `OWNER_EMAIL` | Owner login email |
@@ -22,10 +21,11 @@ Set these in **Vercel → Project → Settings → Environment Variables**. Neve
 
 If Recommend Now / Invite show `Invalid scheme…`, open **Vercel → Settings → Environment Variables** and fix `MONGODB_URI`:
 
-1. Value must look like: `mongodb+srv://USER:PASSWORD@cluster.mongodb.net/?retryWrites=true&w=majority`
-2. No leading/trailing quotes (`"..."` / `'...'`)
-3. No `MONGODB_DB` value pasted into `MONGODB_URI` by mistake
-4. Redeploy after saving
+1. Value must look like: `mongodb+srv://USER:PASSWORD@cluster.mongodb.net/moviechoice?retryWrites=true&w=majority`
+2. Put the database name **in the URI path** (`/moviechoice`) — do not use `MONGODB_DB`
+3. No leading/trailing quotes (`"..."` / `'...'`)
+4. You can delete `MONGODB_DB` from Vercel if it exists — the app ignores it
+5. Redeploy after saving
 
 
 ## Recommended

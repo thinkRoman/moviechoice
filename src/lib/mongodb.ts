@@ -50,13 +50,8 @@ export function assertMongoUri(uri: string): void {
   }
 }
 
-/** Database name for per-family MovieChoice data. Prefer MONGODB_DB over a path in the URI. */
-export function resolveMongoDbName(
-  uri = process.env.MONGODB_URI,
-  dbName = process.env.MONGODB_DB,
-): string | undefined {
-  const explicit = dbName?.trim();
-  if (explicit) return explicit;
+/** Database name taken from the path in MONGODB_URI (e.g. ...mongodb.net/moviechoice). */
+export function resolveMongoDbName(uri = process.env.MONGODB_URI): string | undefined {
   const normalized = normalizeMongoUri(uri);
   if (!normalized) return undefined;
   try {
@@ -67,16 +62,11 @@ export function resolveMongoDbName(
   }
 }
 
-export function mongoConnectionOptions(
-  uri = process.env.MONGODB_URI,
-  dbName = process.env.MONGODB_DB,
-): mongoose.ConnectOptions {
-  const name = resolveMongoDbName(uri, dbName);
+export function mongoConnectionOptions(): mongoose.ConnectOptions {
   return {
     maxPoolSize: 10,
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
-    ...(name ? { dbName: name } : {}),
   };
 }
 
@@ -89,8 +79,9 @@ async function dbConnect() {
   }
 
   if (!cached.promise) {
+    // Use only MONGODB_URI — database name comes from the URI path. Do not override with MONGODB_DB.
     cached.promise = mongoose
-      .connect(MONGODB_URI, mongoConnectionOptions(MONGODB_URI))
+      .connect(MONGODB_URI, mongoConnectionOptions())
       .catch((error) => {
         cached.promise = null;
         throw error;

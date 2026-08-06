@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { assertMongoUri, normalizeMongoUri } from '@/lib/mongodb';
+import {
+  assertMongoUri,
+  mongoConnectionOptions,
+  normalizeMongoUri,
+  resolveMongoDbName,
+} from '@/lib/mongodb';
 
 describe('normalizeMongoUri', () => {
   it('strips wrapping quotes and whitespace', () => {
@@ -19,5 +24,25 @@ describe('normalizeMongoUri', () => {
   it('rejects invalid schemes with a clear error', () => {
     expect(() => assertMongoUri('')).toThrow(/MONGODB_URI is missing/);
     expect(() => assertMongoUri('moviechoice')).toThrow(/must start with mongodb/);
+  });
+});
+
+describe('MongoDB URI-only configuration', () => {
+  it('reads the database name from the URI path', () => {
+    expect(
+      resolveMongoDbName(
+        'mongodb+srv://user:pass@cluster.mongodb.net/moviechoice?retryWrites=true',
+      ),
+    ).toBe('moviechoice');
+  });
+
+  it('returns undefined when the URI has no database path', () => {
+    expect(
+      resolveMongoDbName('mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true'),
+    ).toBeUndefined();
+  });
+
+  it('does not force a dbName override in connection options', () => {
+    expect(mongoConnectionOptions()).not.toHaveProperty('dbName');
   });
 });
