@@ -508,3 +508,77 @@ export async function getMovieDetails(id: string): Promise<MovieDetails | null> 
     throw error;
   }
 }
+
+export async function getTitleRecommendations(
+  mediaType: 'movie' | 'tv',
+  id: number,
+): Promise<DiscoverTitle[]> {
+  try {
+    const data = await tmdbFetch<TmdbListResponse<TmdbMovie | TmdbTv>>(
+      `/${mediaType}/${id}/recommendations`,
+      { language: 'en-US', page: '1' },
+      3600,
+    );
+    return data.results
+      .filter((title) => title.poster_path && title.overview)
+      .map((title) => toDiscoverTitle(title, mediaType));
+  } catch {
+    return [];
+  }
+}
+
+export async function getTvDetails(id: string): Promise<(MovieDetails & { episodeCount: number | null; seasonCount: number | null }) | null> {
+  try {
+    interface TmdbTvDetails extends TmdbTv {
+      genres: TmdbGenre[];
+      episode_run_time?: number[];
+      number_of_episodes?: number | null;
+      number_of_seasons?: number | null;
+      credits: TmdbCredits;
+      videos: TmdbVideos;
+    }
+    const show = await tmdbFetch<TmdbTvDetails>(
+      `/tv/${encodeURIComponent(id)}`,
+      { append_to_response: 'credits,videos' },
+      86400,
+    );
+
+    const trailer = show.videos.results.find(
+      (video) => video.site === 'YouTube' && video.type === 'Trailer' && video.official,
+    ) || show.videos.results.find(
+      (video) => video.site === 'YouTube' && video.type === 'Trailer',
+    );
+
+    const releaseDate = show.first_air_date || null;
+    return {
+      id: show.id,
+      title: show.name,
+      overview: show.overview,
+      posterUrl: imageUrl(show.poster_path, 'w500'),
+      posterPath: show.poster_path,
+      backdropUrl: imageUrl(show.backdrop_path, 'original'),
+      releaseDate,
+      year: releaseDate?.slice(0, 4) || null,
+      rating: show.vote_average,
+      voteCount: show.vote_count,
+      popularity: show.popularity,
+      runtime: show.episode_run_time?.[0] ?? null,
+      episodeCount: show.number_of_episodes ?? null,
+      seasonCount: show.number_of_seasons ?? null,
+      genres: show.genres.map((genre) => genre.name),
+      cast: show.credits.cast
+        .toSorted((a, b) => a.order - b.order)
+        .slice(0, 8)
+        .map((person) => ({
+          id: person.id,
+          name: person.name,
+          character: person.character,
+          profileUrl: imageUrl(person.profile_path, 'w342'),
+        })),
+      trailerUrl: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('(404)')) return null;
+    throw error;
+  }
+}

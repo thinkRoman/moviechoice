@@ -182,6 +182,37 @@ export function formatRuntime(minutes: number | null | undefined): string | null
   return `${hours}H ${mins}M`;
 }
 
+export function needsWeeklyRefresh(
+  weeklyRefresh: boolean,
+  lastGeneratedAt: string | Date | null | undefined,
+  now = new Date(),
+): boolean {
+  if (!weeklyRefresh) return false;
+  if (!lastGeneratedAt) return true;
+  const last = new Date(lastGeneratedAt);
+  if (Number.isNaN(last.getTime())) return true;
+
+  // Most recent Friday 00:00 UTC
+  const friday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const day = friday.getUTCDay(); // 0 Sun .. 5 Fri
+  const daysSinceFriday = (day + 2) % 7;
+  friday.setUTCDate(friday.getUTCDate() - daysSinceFriday);
+  friday.setUTCHours(0, 0, 0, 0);
+  return last < friday;
+}
+
+export function isOnboardingNeeded(settings: PickSettings, onboardingCompletedAt?: string | Date | null): boolean {
+  if (onboardingCompletedAt) return false;
+  const sameProviders =
+    settings.providerIds.length === DEFAULT_PICK_SETTINGS.providerIds.length
+    && settings.providerIds.every((id) => DEFAULT_PICK_SETTINGS.providerIds.includes(id));
+  const sameCounts =
+    settings.movieCount === DEFAULT_PICK_SETTINGS.movieCount
+    && settings.showCount === DEFAULT_PICK_SETTINGS.showCount;
+  return sameProviders && sameCounts && !settings.tasteNote.trim();
+}
+
+
 function stableVariety(id: number, seed: string): number {
   let hash = id;
   for (const char of seed) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
@@ -246,6 +277,8 @@ function titleScore(
   seed: string,
   settings: PickSettings,
   intent: SessionIntent,
+  seedBoost = 0,
+  softAvoidGenreIds: number[] = [],
 ): number {
   const year = Number(title.year) || 2000;
   const recency = Math.max(0, year - 2015) * 0.25;
@@ -256,17 +289,33 @@ function titleScore(
   const genreAffinity = title.genreIds.filter((id) => preferredGenres.includes(id)).length * 4;
   const searchable = `${title.title} ${title.overview}`.toLowerCase();
   const keywordAffinity = intent.keywords.filter((keyword) => searchable.includes(keyword)).length * 2.5;
+  const avoidPenalty = title.genreIds.filter((id) => softAvoidGenreIds.includes(id)).length * 3.5;
   return (title.rating - minimumRating) * 12
     + Math.log10(Math.max(title.voteCount, 1)) * 4
     + recency
     + international
     + genreAffinity
     + keywordAffinity
-    + stableVariety(title.id, seed) * 10;
+    + Math.min(seedBoost, 4) * 22
+    + stableVariety(title.id, seed) * 10
+    - avoidPenalty;
 }
 
 export function dedupeTitles(candidates: DiscoverTitle[]): DiscoverTitle[] {
   return [...new Map(candidates.map((title) => [`${title.mediaType}:${title.id}`, title])).values()];
+}
+
+export function mergeSeedCandidates(
+  base: DiscoverTitle[],
+  seeded: DiscoverTitle[],
+): { candidates: DiscoverTitle[]; boosts: Map<number, number> } {
+  const boosts = new Map<number, number>();
+  const byId = new Map<number, DiscoverTitle>();
+  for (const title of [...base, ...seeded]) {
+    byId.set(title.id, title);
+    boosts.set(title.id, (boosts.get(title.id) || 0) + (seeded.some((item) => item.id === title.id) ? 1 : 0));
+  }
+  return { candidates: [...byId.values()], boosts };
 }
 
 export function rankRecommendations({
@@ -277,6 +326,8 @@ export function rankRecommendations({
   settings,
   seed,
   intent = interpretSessionRequest(''),
+  seedBoosts = new Map<number, number>(),
+  softAvoidGenreIds = [],
 }: {
   candidates: DiscoverTitle[];
   kind: RecommendedTitle['kind'];
@@ -285,6 +336,8 @@ export function rankRecommendations({
   settings: PickSettings;
   seed: string;
   intent?: SessionIntent;
+  seedBoosts?: Map<number, number>;
+  softAvoidGenreIds?: number[];
 }): RecommendedTitle[] {
   const minimumRating = kind === 'show' ? 7 : 6.6;
   const minimumVotes = kind === 'show' ? 150 : 300;
@@ -323,7 +376,15 @@ export function rankRecommendations({
         letterboxdUrl: title.mediaType === 'movie'
           ? `https://letterboxd.com/search/${encodeURIComponent(title.title)}/`
           : null,
-        score: titleScore(title, minimumRating, seed, settings, intent),
+        score: titleScore(
+          title,
+          minimumRating,
+          seed,
+          settings,
+          intent,
+          seedBoosts.get(title.id) || 0,
+          softAvoidGenreIds,
+        ),
         reason: [
           `A ${title.rating.toFixed(1)}-rated ${kind}`,
           providerNames.length ? `available with ${providerNames.join(' or ')}` : 'ready to stream',

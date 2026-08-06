@@ -27,6 +27,8 @@ export interface IProfile {
     ratings: { titleId: number; rating: number }[];
   };
   recommendationHistory: string[];
+  lastPicksGeneratedAt?: Date | null;
+  onboardingCompletedAt?: Date | null;
   isPrimary: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -61,6 +63,8 @@ const ProfileSchema = new Schema<IProfile>(
       ],
     },
     recommendationHistory: [{ type: String }],
+    lastPicksGeneratedAt: { type: Date, default: null },
+    onboardingCompletedAt: { type: Date, default: null },
     isPrimary: { type: Boolean, default: false },
   },
   { timestamps: true }
