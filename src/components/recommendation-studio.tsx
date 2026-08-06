@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Globe2,
@@ -14,6 +14,7 @@ import {
   Star,
 } from 'lucide-react';
 import LibraryActions from '@/components/library-actions';
+import FamilyTakes from '@/components/family-takes';
 import { useLibrary } from '@/components/library-provider';
 import {
   DEFAULT_PICK_SETTINGS,
@@ -28,6 +29,8 @@ interface PicksResponse {
   settings: PickSettings;
   items: RecommendedTitle[];
   generatedAt: string;
+  needsWeeklyRefresh?: boolean;
+  needsOnboarding?: boolean;
 }
 
 function weekLabel(date = new Date()) {
@@ -57,7 +60,7 @@ function metaLine(item: RecommendedTitle) {
 function PickCard({ item, onHidden }: { item: RecommendedTitle; onHidden(id: number, mediaType: 'movie' | 'tv'): void }) {
   const { itemFor } = useLibrary();
   const libraryItem = itemFor(item.mediaType, item.id);
-  const detailsHref = item.mediaType === 'movie' ? `/movies/${item.id}` : (item.tmdbUrl || `https://www.themoviedb.org/tv/${item.id}`);
+  const detailsHref = item.mediaType === 'movie' ? `/movies/${item.id}` : `/shows/${item.id}`;
   const whereToWatch = item.tmdbUrl
     ? `${item.tmdbUrl}/watch`
     : detailsHref;
@@ -140,12 +143,13 @@ function PickCard({ item, onHidden }: { item: RecommendedTitle; onHidden(id: num
           ) : null}
           <Link
             href={detailsHref}
-            target={item.mediaType === 'tv' ? '_blank' : undefined}
             className="inline-flex items-center gap-1 hover:text-violet-900"
           >
             Details <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         </div>
+
+        <FamilyTakes mediaType={item.mediaType} tmdbId={item.id} />
       </div>
     </article>
   );
@@ -183,26 +187,14 @@ export default function RecommendationStudio() {
   const [sessionNote, setSessionNote] = useState('');
   const [showOverride, setShowOverride] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [weeklyHint, setWeeklyHint] = useState(false);
+  const createPicksRef = useRef<() => Promise<void>>(async () => undefined);
 
-  useEffect(() => {
-    fetch('/api/recommendations', { cache: 'no-store' })
-      .then(async (response) => {
-        const body = await response.json().catch(() => ({})) as { settings?: PickSettings; error?: string };
-        setSettings(normalizePickSettings(body.settings || DEFAULT_PICK_SETTINGS));
-        if (!response.ok && response.status === 401) {
-          setError('Please sign in again to load your saved settings.');
-        }
-      })
-      .catch(() => {
-        setSettings(DEFAULT_PICK_SETTINGS);
-        setError('Using default settings for now. Open Settings to personalize, then try again.');
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  async function createPicks() {
+  const createPicks = useCallback(async () => {
     setCreating(true);
     setError('');
+    setWeeklyHint(false);
     try {
       const response = await fetch('/api/recommendations', {
         method: 'POST',
@@ -214,14 +206,69 @@ export default function RecommendationStudio() {
       });
       const body = await response.json() as PicksResponse & { error?: string };
       if (!response.ok) throw new Error(body.error || 'MovieChoice could not create your picks.');
+      if (!body.items?.length) {
+        setPicks(body);
+        setError('No titles matched your services and filters. Try more streaming services or broader genres in Settings.');
+        return;
+      }
       setPicks(body);
       setHiddenKeys(new Set());
       requestAnimationFrame(() => document.querySelector('#your-picks')?.scrollIntoView({ behavior: 'smooth' }));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'MovieChoice could not create your picks.');
+      setError(caught instanceof Error ? caught.message : 'MovieChoice could not create your picks. Check your connection and try again.');
     } finally {
       setCreating(false);
     }
+  }, [sessionNote]);
+
+  createPicksRef.current = createPicks;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/recommendations', { cache: 'no-store' })
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({})) as {
+          settings?: PickSettings;
+          error?: string;
+          needsWeeklyRefresh?: boolean;
+          needsOnboarding?: boolean;
+        };
+        if (cancelled) return;
+        setSettings(normalizePickSettings(body.settings || DEFAULT_PICK_SETTINGS));
+        setNeedsOnboarding(Boolean(body.needsOnboarding));
+        setWeeklyHint(Boolean(body.needsWeeklyRefresh));
+        if (!response.ok && response.status === 401) {
+          setError('Please sign in again to load your saved settings.');
+        }
+        if (body.needsWeeklyRefresh) {
+          window.setTimeout(() => {
+            if (!cancelled) void createPicksRef.current();
+          }, 250);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSettings(DEFAULT_PICK_SETTINGS);
+        setError('Using default settings for now. Open Settings to personalize, then try again.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function clearHistory() {
+    setMenuOpen(false);
+    const response = await fetch('/api/recommendations', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clearHistory: true }),
+    });
+    setError(response.ok
+      ? 'History cleared. Refresh picks for a fresh shortlist (watched titles still stay out).'
+      : 'Could not clear history.');
   }
 
   const hideTitle = useCallback((id: number, mediaType: 'movie' | 'tv') => {
@@ -273,6 +320,9 @@ export default function RecommendationStudio() {
             <Link href="/settings" className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-white">
               <Settings className="h-4 w-4 text-violet-600" /> Edit saved settings
             </Link>
+            <button type="button" onClick={clearHistory} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-zinc-700 hover:bg-white">
+              Fresh start (clear pick history)
+            </button>
             <Link href="/my-movies" className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-white">
               <Sparkles className="h-4 w-4 text-violet-600" /> My Movies
             </Link>
@@ -284,6 +334,21 @@ export default function RecommendationStudio() {
       </header>
 
       <div className="relative mx-auto max-w-3xl px-4 pb-36 pt-8 sm:px-6">
+        {needsOnboarding ? (
+          <div className="mb-5 rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+            <p className="font-bold">Welcome — set up your picks</p>
+            <p className="mt-1 text-amber-800/90">Choose your streaming services and how many movies/shows you want, then come back and tap Recommend Now.</p>
+            <Link href="/settings" className="mt-3 inline-flex rounded-full bg-violet-600 px-4 py-2 text-xs font-bold text-white">
+              Start setup
+            </Link>
+          </div>
+        ) : null}
+        {weeklyHint ? (
+          <div className="mb-5 rounded-[1.5rem] border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950">
+            <p className="font-bold">New Friday picks are ready</p>
+            <p className="mt-1 text-violet-800/90">Refreshing your Movies & Shows shortlist for this week…</p>
+          </div>
+        ) : null}
         <section className="rounded-[1.75rem] border border-violet-100 bg-white/80 p-5 shadow-[0_18px_50px_-30px_rgba(91,33,182,0.45)] backdrop-blur sm:p-6">
           <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-500">Family watch night</p>
           <h1 className="mt-2 font-serif text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl">
@@ -356,7 +421,21 @@ export default function RecommendationStudio() {
               <h2 className="mt-4 text-xl font-bold text-zinc-900">Your shortlist will appear here</h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">
                 Movies and shows from the services you pay for — in the counts you set in Settings.
+                {settings.providerIds.length === 0 ? ' Choose at least one streaming service first.' : ''}
               </p>
+              <div className="mt-5 flex flex-wrap justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={createPicks}
+                  disabled={creating || loading || settings.providerIds.length === 0}
+                  className="rounded-full bg-violet-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  Recommend Now
+                </button>
+                <Link href="/settings" className="rounded-full border border-violet-200 bg-white px-5 py-2.5 text-sm font-bold text-violet-700">
+                  Edit settings
+                </Link>
+              </div>
             </div>
           )}
         </div>

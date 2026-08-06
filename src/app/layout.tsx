@@ -1,8 +1,9 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Fraunces, Outfit } from 'next/font/google';
 import { SessionProvider } from 'next-auth/react';
 import { LibraryProvider } from '@/components/library-provider';
+import PwaRegister from '@/components/pwa-register';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -22,12 +23,39 @@ export const metadata: Metadata = {
     template: '%s — MovieChoice',
   },
   description:
-    'Discover trending, popular, top-rated, and upcoming movies.',
-  manifest: '/manifest.json',
+    'Eliminate streaming decision fatigue with personalized movie and show picks for your family.',
+  applicationName: 'MovieChoice',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'MovieChoice',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
-export const viewport = {
-  themeColor: '#7c3aed',
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f3eefc' },
+    { media: '(prefers-color-scheme: dark)', color: '#08090d' },
+  ],
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -37,9 +65,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${outfit.variable} ${fraunces.variable} font-sans antialiased`}>
+      <body className={`${outfit.variable} ${fraunces.variable} font-sans antialiased touch-manipulation`}>
         <SessionProvider>
-          <LibraryProvider>{children}</LibraryProvider>
+          <LibraryProvider>
+            {children}
+            <PwaRegister />
+          </LibraryProvider>
         </SessionProvider>
       </body>
     </html>

@@ -128,7 +128,7 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
       const response = await fetch('/api/recommendations', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, completeOnboarding: true }),
       });
       const body = await response.json() as { error?: string; settings?: PickSettings };
       if (!response.ok) throw new Error(body.error || 'Could not save settings.');
@@ -258,6 +258,10 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
             <input type="checkbox" checked={settings.includeInternational} onChange={(event) => setSettings({ ...settings, includeInternational: event.target.checked })} className="h-5 w-5 accent-violet-500" />
             Include international titles
           </label>
+          <label className="mt-4 flex items-center gap-3 text-sm font-semibold text-zinc-300">
+            <input type="checkbox" checked={settings.weeklyRefresh} onChange={(event) => setSettings({ ...settings, weeklyRefresh: event.target.checked })} className="h-5 w-5 accent-violet-500" />
+            Auto-refresh picks each Friday
+          </label>
         </section>
 
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
@@ -275,6 +279,23 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
           <button type="button" onClick={save} disabled={saving || settings.providerIds.length === 0} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-violet-500 px-6 font-black hover:bg-violet-400 disabled:opacity-50">
             {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? 'Saving…' : 'Save settings'}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              const response = await fetch('/api/recommendations', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clearHistory: true }),
+              });
+              setMessage(response.ok ? 'Pick history cleared. Watched titles still stay excluded.' : 'Could not clear history.');
+              setSaving(false);
+            }}
+            className="px-5 py-3 text-center text-sm font-semibold text-zinc-400 hover:text-white"
+          >
+            Fresh start
           </button>
           <Link href="/for-you" className="px-5 py-3 text-center text-sm font-semibold text-zinc-400 hover:text-white">Back to Picks</Link>
         </div>
