@@ -2,7 +2,8 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import dbConnect from '@/lib/mongodb';
 import User from '@/models/User';
-import { authenticateAccess, type UserRole } from '@/lib/access';
+import { authenticateAccess, ownerId, type UserRole } from '@/lib/access';
+import { ensureUserProfile } from '@/lib/user-profile';
 
 // Extended session shape
 declare module 'next-auth' {
@@ -18,6 +19,36 @@ declare module 'next-auth' {
       role: UserRole;
     };
   }
+}
+
+async function persistOwnerIdentity(email: string, name: string, preferredId: string) {
+  await dbConnect();
+  const existing = await User.findOne({ email });
+  if (existing) {
+    await User.updateOne(
+      { _id: existing._id },
+      {
+        $set: {
+          name,
+          role: 'OWNER',
+          status: 'ACTIVE',
+          lastLoginAt: new Date(),
+        },
+      },
+    );
+    return existing._id.toString();
+  }
+
+  await User.create({
+    _id: preferredId,
+    email,
+    name,
+    emailVerified: new Date(),
+    role: 'OWNER',
+    status: 'ACTIVE',
+    lastLoginAt: new Date(),
+  });
+  return preferredId;
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -55,9 +86,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         );
 
         if (!principal) return null;
-        if (principal.role === 'MEMBER') {
-          await User.updateOne({ _id: principal.id }, { $set: { lastLoginAt: new Date() } });
+
+        if (principal.role === 'OWNER') {
+          const preferredId = principal.id || ownerId(principal.email);
+          const id = await persistOwnerIdentity(principal.email, principal.name, preferredId);
+          await ensureUserProfile(id, principal.name);
+          return { ...principal, id };
         }
+
+        await User.updateOne({ _id: principal.id }, { $set: { lastLoginAt: new Date() } });
+        await ensureUserProfile(principal.id, principal.name);
         return principal;
       },
     }),
