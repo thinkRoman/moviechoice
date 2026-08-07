@@ -181,6 +181,7 @@ export interface EnrichedTitle extends DiscoverTitle {
   providerNames: string[];
   primaryProvider: string | null;
   tmdbUrl: string;
+  imdbId?: string | null;
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -285,6 +286,7 @@ interface TmdbMovieEnrichment extends TmdbMovie {
   runtime: number | null;
   number_of_episodes?: never;
   number_of_seasons?: never;
+  external_ids?: { imdb_id?: string | null };
 }
 
 interface TmdbTvEnrichment extends TmdbTv {
@@ -292,6 +294,7 @@ interface TmdbTvEnrichment extends TmdbTv {
   episode_run_time?: number[];
   number_of_episodes?: number | null;
   number_of_seasons?: number | null;
+  external_ids?: { imdb_id?: string | null };
 }
 
 function languageName(code: string | null | undefined): string | null {
@@ -352,7 +355,11 @@ export async function enrichDiscoverTitle(
 ): Promise<EnrichedTitle> {
   const path = title.mediaType === 'movie' ? `/movie/${title.id}` : `/tv/${title.id}`;
   const [details, providers] = await Promise.all([
-    tmdbFetch<TmdbMovieEnrichment | TmdbTvEnrichment>(path, { language: 'en-US' }, 86400),
+    tmdbFetch<TmdbMovieEnrichment | TmdbTvEnrichment>(
+      path,
+      { language: 'en-US', append_to_response: 'external_ids' },
+      86400,
+    ),
     tmdbFetch<TmdbWatchProviderResult>(`${path}/watch/providers`, {}, 86400),
   ]);
 
@@ -360,6 +367,7 @@ export async function enrichDiscoverTitle(
     providers.results?.US?.flatrate,
     preferredProviderIds,
   );
+  const imdbId = details.external_ids?.imdb_id || null;
 
   if (title.mediaType === 'movie') {
     const movie = details as TmdbMovieEnrichment;
@@ -378,6 +386,7 @@ export async function enrichDiscoverTitle(
       providerNames,
       primaryProvider,
       tmdbUrl: `https://www.themoviedb.org/movie/${title.id}`,
+      imdbId,
       international: (movie.original_language || title.originalLanguage || 'en') !== 'en',
     };
   }
@@ -398,6 +407,7 @@ export async function enrichDiscoverTitle(
     providerNames,
     primaryProvider,
     tmdbUrl: `https://www.themoviedb.org/tv/${title.id}`,
+    imdbId,
     international: (show.original_language || title.originalLanguage || 'en') !== 'en',
   };
 }
@@ -439,20 +449,106 @@ export async function discoverTitles(
     .map((title) => toDiscoverTitle(title, mediaType));
 }
 
-async function movieList(path: string): Promise<MovieSummary[]> {
-  const data = await tmdbFetch<TmdbListResponse>(path);
+async function movieList(path: string, params: Record<string, string> = {}): Promise<MovieSummary[]> {
+  const data = await tmdbFetch<TmdbListResponse>(path, {
+    language: 'en-US',
+    region: 'US',
+    ...params,
+  });
   return data.results.filter((movie) => movie.poster_path).map(toMovieSummary);
 }
 
-export async function getHomeMovies() {
+/** UTC calendar date as YYYY-MM-DD — used so Coming Soon knows “today”. */
+export function utcDateString(date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}
+
+export function addUtcDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+/** Drop titles whose primary release date is already before today (UTC). */
+export function filterFutureReleases<T extends { releaseDate: string | null }>(
+  movies: T[],
+  today = utcDateString(),
+): T[] {
+  return movies.filter((movie) => {
+    if (!movie.releaseDate) return false;
+    return movie.releaseDate >= today;
+  });
+}
+
+/**
+ * US theatrical releases still ahead of today.
+ * Uses discover (not raw /movie/upcoming) so already-in-theaters titles are excluded.
+ */
+export async function getComingSoonMovies(today = new Date()): Promise<MovieSummary[]> {
+  const todayStr = utcDateString(today);
+  const untilStr = utcDateString(addUtcDays(today, 120));
+  const base = {
+    include_adult: 'false',
+    include_video: 'false',
+    language: 'en-US',
+    region: 'US',
+    with_release_type: '2|3',
+    'primary_release_date.gte': todayStr,
+    'primary_release_date.lte': untilStr,
+    page: '1',
+  };
+
+  const [popularityPage, datePage] = await Promise.all([
+    tmdbFetch<TmdbListResponse>(`/discover/movie`, { ...base, sort_by: 'popularity.desc' }, 1800),
+    tmdbFetch<TmdbListResponse>(`/discover/movie`, { ...base, sort_by: 'primary_release_date.asc' }, 1800),
+  ]);
+
+  const byId = new Map<number, MovieSummary>();
+  for (const movie of [...popularityPage.results, ...datePage.results]) {
+    if (!movie.poster_path) continue;
+    const summary = toMovieSummary(movie);
+    if (!summary.releaseDate || summary.releaseDate < todayStr) continue;
+    if (byId.has(summary.id)) continue;
+    byId.set(summary.id, summary);
+  }
+
+  return [...byId.values()]
+    .toSorted((a, b) => (a.releaseDate || '').localeCompare(b.releaseDate || '')
+      || b.popularity - a.popularity);
+}
+
+/**
+ * Letterboxd deep link. Prefer IMDb redirect (always lands on the film page).
+ * Bare /search/{title}/ loads results via AJAX and often looks like a dead page.
+ */
+export function letterboxdUrlForMovie(input: {
+  title: string;
+  year?: string | null;
+  imdbId?: string | null;
+}): string | null {
+  const imdbId = input.imdbId?.trim();
+  if (imdbId && /^tt\d+$/i.test(imdbId)) {
+    return `https://letterboxd.com/imdb/${imdbId}/`;
+  }
+  const query = [input.title.trim(), input.year?.trim()].filter(Boolean).join(' ');
+  if (!query) return null;
+  return `https://letterboxd.com/search/films/${encodeURIComponent(query)}/`;
+}
+
+export async function getHomeMovies(today = new Date()) {
   const [trending, popular, topRated, upcoming] = await Promise.all([
     movieList('/trending/movie/week'),
     movieList('/movie/popular'),
     movieList('/movie/top_rated'),
-    movieList('/movie/upcoming'),
+    getComingSoonMovies(today),
   ]);
 
-  return { trending, popular, topRated, upcoming };
+  return {
+    trending,
+    popular,
+    topRated,
+    upcoming: filterFutureReleases(upcoming, utcDateString(today)),
+  };
 }
 
 export async function searchMovies(query: string, page = 1): Promise<MovieSearchResult> {

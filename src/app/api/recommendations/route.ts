@@ -5,7 +5,7 @@ import { explainRecommendations } from '@/lib/ai/explanations';
 import { cachedEnrichDiscoverTitle } from '@/lib/catalog-cache';
 import { createRequestId } from '@/lib/id';
 import dbConnect from '@/lib/mongodb';
-import { discoverTitles, getTitleRecommendations } from '@/lib/tmdb';
+import { discoverTitles, getTitleRecommendations, letterboxdUrlForMovie } from '@/lib/tmdb';
 import {
   DEFAULT_PICK_SETTINGS,
   MAX_GENRES,
@@ -121,7 +121,11 @@ async function finalizePicks(
         score: item.score,
         reason: item.reason,
         letterboxdUrl: item.mediaType === 'movie'
-          ? `https://letterboxd.com/search/${encodeURIComponent(item.title)}/`
+          ? letterboxdUrlForMovie({
+              title: item.title,
+              year: item.year,
+              imdbId: details.imdbId,
+            })
           : null,
       });
     } catch {

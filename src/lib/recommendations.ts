@@ -1,4 +1,4 @@
-import type { DiscoverTitle } from '@/lib/tmdb';
+import { letterboxdUrlForMovie, type DiscoverTitle } from '@/lib/tmdb';
 
 /** Popular US subscription services shown first in Settings. */
 export const STREAMING_SERVICES = [
@@ -374,7 +374,7 @@ export function rankRecommendations({
           ? `https://www.themoviedb.org/movie/${title.id}`
           : `https://www.themoviedb.org/tv/${title.id}`,
         letterboxdUrl: title.mediaType === 'movie'
-          ? `https://letterboxd.com/search/${encodeURIComponent(title.title)}/`
+          ? letterboxdUrlForMovie({ title: title.title, year: title.year })
           : null,
         score: titleScore(
           title,
