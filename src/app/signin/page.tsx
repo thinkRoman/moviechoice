@@ -6,8 +6,8 @@ import { signIn, useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 function safeCallbackUrl(value: string | null): string {
-  if (!value) return '/for-you';
-  if (!value.startsWith('/') || value.startsWith('//')) return '/for-you';
+  if (!value) return '/';
+  if (!value.startsWith('/') || value.startsWith('//')) return '/';
   return value;
 }
 

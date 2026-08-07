@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'MovieChoice',
     description:
       'Personalized movie and show picks for your family — Add to Home Screen for the full iPhone app feel.',
-    start_url: '/for-you',
+    start_url: '/',
     display: 'standalone',
     display_override: ['standalone', 'browser'],
     background_color: '#f3eefc',
