@@ -31,6 +31,8 @@ export const STREAMING_SERVICES = [
   { id: 123, name: 'FXNow' },
   { id: 185, name: 'Screambox' },
   { id: 289, name: 'Kanopy' },
+  { id: 143, name: 'Sundance Now' },
+  { id: 438, name: 'ChaiFlicks' },
 ] as const;
 
 /** Core affinities shown first; more TMDB genres available via “Add genres”. */

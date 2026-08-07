@@ -11,9 +11,15 @@ const updateSchema = z.object({
   action: z.enum(['watchlist', 'watched', 'favorite', 'dismissed']),
   value: z.boolean(),
   title: z.string().trim().min(1).max(300),
-  posterPath: z.string().nullable(),
-  releaseYear: z.string().regex(/^\d{4}$/).nullable(),
-  mediaType: z.enum(['movie', 'tv']),
+  posterPath: z.string().nullish().transform((value) => value ?? null),
+  releaseYear: z
+    .union([z.string(), z.null(), z.undefined()])
+    .transform((value) => {
+      if (value == null || value === '') return null;
+      const year = String(value).trim().slice(0, 4);
+      return /^\d{4}$/.test(year) ? year : null;
+    }),
+  mediaType: z.enum(['movie', 'tv']).default('movie'),
 });
 
 export async function PUT(
@@ -22,9 +28,13 @@ export async function PUT(
 ) {
   const { tmdbMovieId } = await params;
   const movieId = Number(tmdbMovieId);
-  const parsed = updateSchema.safeParse(await request.json());
+  const parsed = updateSchema.safeParse(await request.json().catch(() => null));
   if (!Number.isSafeInteger(movieId) || movieId <= 0 || !parsed.success) {
-    return NextResponse.json({ error: 'Invalid movie update' }, { status: 400 });
+    return NextResponse.json({
+      error: parsed.success
+        ? 'Invalid movie id'
+        : (parsed.error.issues[0]?.message || 'Invalid movie update'),
+    }, { status: 400 });
   }
 
   try {
@@ -44,9 +54,11 @@ export async function PUT(
     );
     return NextResponse.json({ item });
   } catch (error) {
+    console.error('PUT /api/my-movies failed', error);
     if (error instanceof UnauthorizedLibraryError) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    return NextResponse.json({ error: 'Could not update your movies' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Could not update your movies';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

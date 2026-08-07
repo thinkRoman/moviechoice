@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, LoaderCircle, Save, Sparkles, UserPlus } from 'lucide-react';
 import {
   DEFAULT_PICK_SETTINGS,
@@ -61,9 +61,11 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
   const [settings, setSettings] = useState<PickSettings>(DEFAULT_PICK_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
   const [message, setMessage] = useState('');
   const [showMoreServices, setShowMoreServices] = useState(false);
   const [showMoreGenres, setShowMoreGenres] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const popularServices = STREAMING_SERVICES.filter((service) => 'popular' in service && service.popular);
   const moreServices = STREAMING_SERVICES.filter((service) => !('popular' in service && service.popular));
@@ -72,7 +74,7 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/recommendations', { cache: 'no-store' })
+    fetch('/api/recommendations', { cache: 'no-store', credentials: 'include' })
       .then(async (response) => {
         const body = await response.json().catch(() => ({})) as { settings?: PickSettings; error?: string };
         const next = normalizePickSettings(body.settings || DEFAULT_PICK_SETTINGS);
@@ -100,10 +102,12 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
       });
     return () => {
       cancelled = true;
+      if (savedTimer.current) clearTimeout(savedTimer.current);
     };
   }, []);
 
   function toggle(key: 'providerIds' | 'genreIds', id: number) {
+    setSavedFlash(false);
     setSettings((current) => {
       const limit = key === 'providerIds' ? MAX_STREAMING_SERVICES : MAX_GENRES;
       const selected = current[key];
@@ -121,19 +125,28 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
   }
 
   async function save() {
+    if (settings.providerIds.length === 0) {
+      setMessage('Choose at least one streaming service before saving.');
+      return;
+    }
     setSaving(true);
+    setSavedFlash(false);
     setMessage('');
     try {
       const payload = normalizePickSettings(settings);
       const response = await fetch('/api/recommendations', {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...payload, completeOnboarding: true }),
       });
       const body = await response.json() as { error?: string; settings?: PickSettings };
       if (!response.ok) throw new Error(body.error || 'Could not save settings.');
       setSettings(normalizePickSettings(body.settings || payload));
-      setMessage('Saved. Future recommendations will use these preferences.');
+      setSavedFlash(true);
+      setMessage('Saved — MovieChoice will use these for Recommend Now.');
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setSavedFlash(false), 4000);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not save settings.');
     } finally {
@@ -175,12 +188,12 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
           <h2 className="text-xl font-black">Weekly mix</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <Stepper label="Movies" value={settings.movieCount} onChange={(movieCount) => setSettings({ ...settings, movieCount })} />
-            <Stepper label="Shows" value={settings.showCount} onChange={(showCount) => setSettings({ ...settings, showCount })} />
-            <Stepper label="Documentaries" value={settings.documentaryCount} onChange={(documentaryCount) => setSettings({ ...settings, documentaryCount })} />
+            <Stepper label="Movies" value={settings.movieCount} onChange={(movieCount) => { setSavedFlash(false); setSettings({ ...settings, movieCount }); }} />
+            <Stepper label="Shows" value={settings.showCount} onChange={(showCount) => { setSavedFlash(false); setSettings({ ...settings, showCount }); }} />
+            <Stepper label="Documentaries" value={settings.documentaryCount} onChange={(documentaryCount) => { setSavedFlash(false); setSettings({ ...settings, documentaryCount }); }} />
           </div>
           <div className="mt-3">
-            <Stepper label="How recent (years)" value={settings.yearsBack} min={1} max={30} onChange={(yearsBack) => setSettings({ ...settings, yearsBack })} />
+            <Stepper label="How recent (years)" value={settings.yearsBack} min={1} max={30} onChange={(yearsBack) => { setSavedFlash(false); setSettings({ ...settings, yearsBack }); }} />
           </div>
         </section>
 
@@ -255,11 +268,11 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
             </button>
           ) : null}
           <label className="mt-6 flex items-center gap-3 text-sm font-semibold text-zinc-300">
-            <input type="checkbox" checked={settings.includeInternational} onChange={(event) => setSettings({ ...settings, includeInternational: event.target.checked })} className="h-5 w-5 accent-violet-500" />
+            <input type="checkbox" checked={settings.includeInternational} onChange={(event) => { setSavedFlash(false); setSettings({ ...settings, includeInternational: event.target.checked }); }} className="h-5 w-5 accent-violet-500" />
             Include international titles
           </label>
           <label className="mt-4 flex items-center gap-3 text-sm font-semibold text-zinc-300">
-            <input type="checkbox" checked={settings.weeklyRefresh} onChange={(event) => setSettings({ ...settings, weeklyRefresh: event.target.checked })} className="h-5 w-5 accent-violet-500" />
+            <input type="checkbox" checked={settings.weeklyRefresh} onChange={(event) => { setSavedFlash(false); setSettings({ ...settings, weeklyRefresh: event.target.checked }); }} className="h-5 w-5 accent-violet-500" />
             Auto-refresh picks each Friday
           </label>
         </section>
@@ -269,37 +282,65 @@ export default function PersonalizationSettings({ isOwner }: { isOwner: boolean 
           <textarea
             value={settings.tasteNote}
             maxLength={240}
-            onChange={(event) => setSettings({ ...settings, tasteNote: event.target.value })}
+            onChange={(event) => { setSavedFlash(false); setSettings({ ...settings, tasteNote: event.target.value }); }}
             placeholder="Subtitled international titles are favorites. Include them regularly."
             className="mt-5 min-h-32 w-full resize-y rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-6 outline-none placeholder:text-zinc-600 focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/20"
           />
         </section>
 
-        <div className="sticky bottom-20 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-zinc-950/90 p-3 shadow-2xl backdrop-blur sm:bottom-4 sm:flex-row sm:items-center">
-          <button type="button" onClick={save} disabled={saving || settings.providerIds.length === 0} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-violet-500 px-6 font-black hover:bg-violet-400 disabled:opacity-50">
-            {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? 'Saving…' : 'Save settings'}
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={async () => {
-              setSaving(true);
-              const response = await fetch('/api/recommendations', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ clearHistory: true }),
-              });
-              setMessage(response.ok ? 'Pick history cleared. Watched titles still stay excluded.' : 'Could not clear history.');
-              setSaving(false);
-            }}
-            className="px-5 py-3 text-center text-sm font-semibold text-zinc-400 hover:text-white"
-          >
-            Fresh start
-          </button>
-          <Link href="/for-you" className="px-5 py-3 text-center text-sm font-semibold text-zinc-400 hover:text-white">Back to Picks</Link>
+        <div className="sticky bottom-20 z-30 space-y-2 rounded-[1.5rem] border border-white/10 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur sm:bottom-4">
+          {message ? (
+            <p
+              role="status"
+              className={`rounded-xl px-4 py-2.5 text-center text-sm font-semibold ${
+                savedFlash
+                  ? 'border border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
+                  : 'border border-white/10 bg-white/5 text-zinc-200'
+              }`}
+            >
+              {savedFlash ? <Check className="mr-1.5 inline h-4 w-4" /> : null}
+              {message}
+            </p>
+          ) : null}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving || settings.providerIds.length === 0}
+              className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full px-6 font-black disabled:opacity-50 ${
+                savedFlash
+                  ? 'bg-emerald-500 text-white hover:bg-emerald-400'
+                  : 'bg-violet-500 hover:bg-violet-400'
+              }`}
+            >
+              {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : savedFlash ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+              {saving ? 'Saving…' : savedFlash ? 'Saved' : 'Save settings'}
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true);
+                setSavedFlash(false);
+                const response = await fetch('/api/recommendations', {
+                  method: 'PUT',
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ clearHistory: true }),
+                });
+                setMessage(response.ok ? 'Pick history cleared. Watched titles still stay excluded.' : 'Could not clear history.');
+                setSaving(false);
+              }}
+              className="px-5 py-3 text-center text-sm font-semibold text-zinc-400 hover:text-white"
+            >
+              Fresh start
+            </button>
+            <Link href="/for-you" className="px-5 py-3 text-center text-sm font-semibold text-zinc-400 hover:text-white">Back to Picks</Link>
+          </div>
+          {settings.providerIds.length === 0 ? (
+            <p className="px-2 text-center text-xs text-amber-200/90">Choose at least one streaming service to enable Save.</p>
+          ) : null}
         </div>
-        {message ? <p role="status" className="text-center text-sm text-zinc-300">{message}</p> : null}
       </div>
     </section>
   );

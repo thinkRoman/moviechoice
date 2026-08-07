@@ -18,12 +18,19 @@ import type {
 
 interface LibraryContextValue {
   authenticated: boolean;
+  ready: boolean;
   itemFor(mediaType: LibraryMovieInput['mediaType'], movieId: number): LibraryItem | undefined;
   pendingKey: string | null;
   toggle(movie: LibraryMovieInput, action: LibraryAction): Promise<void>;
 }
 
 const LibraryContext = createContext<LibraryContextValue | null>(null);
+
+function normalizeReleaseYear(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const year = String(value).trim().slice(0, 4);
+  return /^\d{4}$/.test(year) ? year : null;
+}
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const { status } = useSession();
@@ -32,10 +39,18 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (status !== 'authenticated') return;
+    if (status !== 'authenticated') {
+      setItems({});
+      return;
+    }
     fetch('/api/my-movies', { cache: 'no-store', credentials: 'include' })
       .then(async (response) => {
-        if (!response.ok) return;
+        if (!response.ok) {
+          setMessage(response.status === 401
+            ? 'Sign in again to sync your watchlist.'
+            : 'Could not load your movie library.');
+          return;
+        }
         const body = await response.json() as { items: LibraryItem[] };
         setItems(Object.fromEntries(body.items.map((item) => [`${item.mediaType}:${item.tmdbMovieId}`, item])));
       })
@@ -43,13 +58,26 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   }, [status]);
 
   const toggle = useCallback(async (movie: LibraryMovieInput, action: LibraryAction) => {
+    if (status !== 'authenticated') {
+      setMessage('Sign in to use Watchlist, Favorites, and Watched.');
+      return;
+    }
+
     const itemKey = `${movie.mediaType}:${movie.tmdbMovieId}`;
     const previous = items[itemKey];
     const field = action === 'watchlist' ? 'inWatchlist' : action;
     const nextValue = !previous?.[field];
+    const payload = {
+      ...movie,
+      posterPath: movie.posterPath ?? null,
+      releaseYear: normalizeReleaseYear(movie.releaseYear),
+      action,
+      value: nextValue,
+    };
     const optimistic: LibraryItem = {
       id: previous?.id || `optimistic-${movie.tmdbMovieId}`,
       ...movie,
+      releaseYear: payload.releaseYear,
       inWatchlist: previous?.inWatchlist || false,
       watched: previous?.watched || false,
       favorite: previous?.favorite || false,
@@ -61,7 +89,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       ...(action === 'watched' && nextValue ? { inWatchlist: false } : {}),
       ...(action === 'dismissed' && nextValue ? { inWatchlist: false, favorite: false } : {}),
     };
-    const key = `${movie.tmdbMovieId}:${action}`;
+    const key = `${movie.mediaType}:${movie.tmdbMovieId}:${action}`;
     setPendingKey(key);
     setItems((current) => ({ ...current, [itemKey]: optimistic }));
 
@@ -70,10 +98,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...movie, action, value: nextValue }),
+        body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error('Update failed');
-      const body = await response.json() as { item: LibraryItem | null };
+      const body = await response.json().catch(() => ({})) as { item?: LibraryItem | null; error?: string };
+      if (!response.ok) {
+        throw new Error(body.error || `Could not update (${response.status})`);
+      }
       setItems((current) => {
         const next = { ...current };
         if (body.item) next[itemKey] = body.item;
@@ -89,21 +119,22 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
               ? nextValue ? 'Added to favorites.' : 'Removed from favorites.'
               : nextValue ? 'Got it — we won’t recommend this again.' : 'This title can be recommended again.',
       );
-    } catch {
+    } catch (error) {
       setItems((current) => {
         const next = { ...current };
         if (previous) next[itemKey] = previous;
         else delete next[itemKey];
         return next;
       });
-      setMessage('That change could not be saved. Please try again.');
+      setMessage(error instanceof Error ? error.message : 'That change could not be saved. Please try again.');
     } finally {
       setPendingKey(null);
     }
-  }, [items]);
+  }, [items, status]);
 
   const value = useMemo<LibraryContextValue>(() => ({
     authenticated: status === 'authenticated',
+    ready: status !== 'loading',
     itemFor: (mediaType, movieId) => items[`${mediaType}:${movieId}`],
     pendingKey,
     toggle,

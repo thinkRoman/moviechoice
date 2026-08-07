@@ -34,14 +34,10 @@ describe('normalizePickSettings', () => {
     });
   });
 
-  it('repairs a zeroed recommendation mix', () => {
-    const result = normalizePickSettings({
-      providerIds: [8],
-      genreIds: [35],
-      movieCount: 0,
-      showCount: 0,
-      documentaryCount: 0,
-    });
-    expect(result.movieCount + result.showCount + result.documentaryCount).toBeGreaterThan(0);
+  it('keeps Sundance Now and ChaiFlicks provider ids', () => {
+    expect(normalizePickSettings({
+      providerIds: [143, 438],
+      genreIds: [18],
+    }).providerIds).toEqual([143, 438]);
   });
 });

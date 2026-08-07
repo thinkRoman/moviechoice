@@ -270,6 +270,8 @@ const PROVIDER_ALIASES: Record<number, string> = {
   531: 'Paramount+',
   538: 'Plex',
   613: 'Freevee',
+  143: 'Sundance Now',
+  438: 'ChaiFlicks',
   1899: 'Max',
 };
 
