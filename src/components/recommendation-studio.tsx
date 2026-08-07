@@ -138,8 +138,8 @@ function PickCard({ item, onHidden }: { item: RecommendedTitle; onHidden(id: num
             Where to watch <ArrowUpRight className="h-3.5 w-3.5" />
           </a>
           {item.letterboxdUrl ? (
-            <a href={item.letterboxdUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-violet-900">
-              Letterboxd <ArrowUpRight className="h-3.5 w-3.5" />
+            <a href={item.letterboxdUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-violet-900" title="Open this title on Letterboxd">
+              View on Letterboxd <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
           ) : null}
           <Link
