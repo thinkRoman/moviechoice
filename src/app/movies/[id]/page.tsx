@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import SiteHeader from '@/components/site-header';
 import { getMovieDetails } from '@/lib/tmdb';
 import LibraryActions from '@/components/library-actions';
+import RecentlyViewedTracker from '@/components/recently-viewed-tracker';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,15 @@ export default async function MovieDetailsPage({
   return (
     <main className="min-h-screen bg-[#08090d] text-white">
       <SiteHeader />
+      <RecentlyViewedTracker
+        id={movie.id}
+        mediaType="movie"
+        title={movie.title}
+        posterUrl={movie.posterUrl}
+        posterPath={movie.posterPath}
+        year={movie.year}
+        rating={movie.rating}
+      />
       <section className="relative min-h-[62svh] overflow-hidden pt-16 sm:min-h-[720px]">
         {movie.backdropUrl ? (
           <Image src={movie.backdropUrl} alt="" fill priority sizes="100vw" className="object-cover object-center" />

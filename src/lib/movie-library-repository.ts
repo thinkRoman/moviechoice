@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import dbConnect from '@/lib/mongodb';
 import UserMovie from '@/models/UserMovie';
 import type {
@@ -6,6 +7,13 @@ import type {
   LibraryMovieInput,
   MovieLibraryRepository,
 } from '@/lib/movie-library';
+
+function toObjectId(userId: string): mongoose.Types.ObjectId | string {
+  if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === userId) {
+    return new mongoose.Types.ObjectId(userId);
+  }
+  return userId;
+}
 
 function serialize(item: {
   _id: { toString(): string };
@@ -47,12 +55,14 @@ const fieldByAction: Record<LibraryAction, 'inWatchlist' | 'watched' | 'favorite
 export const movieLibraryRepository: MovieLibraryRepository = {
   async list(userId) {
     await dbConnect();
-    const items = await UserMovie.find({ userId }).sort({ updatedAt: -1 }).lean();
+    const scopedId = toObjectId(userId);
+    const items = await UserMovie.find({ userId: scopedId }).sort({ updatedAt: -1 }).lean();
     return items.map(serialize);
   },
 
   async setFlag(userId, movie, action, value) {
     await dbConnect();
+    const scopedId = toObjectId(userId);
     const field = fieldByAction[action];
     const set: Record<string, unknown> = {
       [field]: value,
@@ -68,14 +78,14 @@ export const movieLibraryRepository: MovieLibraryRepository = {
     }
 
     const item = await UserMovie.findOneAndUpdate(
-      { userId, mediaType: movie.mediaType, tmdbMovieId: movie.tmdbMovieId },
-      { $set: set, $setOnInsert: { userId, mediaType: movie.mediaType, tmdbMovieId: movie.tmdbMovieId } },
+      { userId: scopedId, mediaType: movie.mediaType, tmdbMovieId: movie.tmdbMovieId },
+      { $set: set, $setOnInsert: { userId: scopedId, mediaType: movie.mediaType, tmdbMovieId: movie.tmdbMovieId } },
       { new: true, upsert: value, runValidators: true },
     );
 
     if (!item) return null;
     if (!item.inWatchlist && !item.watched && !item.favorite && !item.dismissed) {
-      await UserMovie.deleteOne({ _id: item._id, userId });
+      await UserMovie.deleteOne({ _id: item._id, userId: scopedId });
       return null;
     }
     return serialize(item);

@@ -1,10 +1,10 @@
 {
   "name": "MovieChoice",
   "short_name": "MovieChoice",
-  "description": "Eliminate streaming decision fatigue with personalized recommendations in seconds.",
+  "description": "Personalized movie and show picks for your family.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
+  "background_color": "#f3eefc",
   "theme_color": "#7c3aed",
   "orientation": "portrait",
   "icons": [

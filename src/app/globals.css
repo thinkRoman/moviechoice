@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* Design Tokens */
 :root {
@@ -38,10 +36,18 @@
   * {
     @apply border-[var(--border)];
   }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
     @apply bg-[var(--background)] text-[var(--foreground)] font-sans;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior-y: none;
+  }
+  button,
+  a {
+    -webkit-touch-callout: none;
   }
 }
 

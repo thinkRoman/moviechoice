@@ -24,6 +24,7 @@ function candidate(overrides: Partial<DiscoverTitle> = {}): DiscoverTitle {
     popularity: 20,
     genreIds: [18],
     international: false,
+    originalLanguage: 'en',
     ...overrides,
   };
 }
@@ -88,6 +89,16 @@ describe('rankRecommendations', () => {
       excludedGenreIds: [27],
       maxRuntime: 90,
       familyFriendly: true,
+    });
+  });
+
+  it('handles empty and exclusion requests without throwing', () => {
+    expect(interpretSessionRequest('')).toMatchObject({ genreIds: [], excludedGenreIds: [] });
+    expect(interpretSessionRequest('no sci-fi tonight')).toMatchObject({
+      excludedGenreIds: expect.arrayContaining([878]),
+    });
+    expect(interpretSessionRequest('avoid horror and no comedy')).toMatchObject({
+      excludedGenreIds: expect.arrayContaining([27, 35]),
     });
   });
 

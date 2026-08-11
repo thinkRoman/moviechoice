@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { regenerateMemberPin } from '@/lib/access';
 import { memberRepository } from '@/lib/member-repository';
 import { sendAccessPinEmail } from '@/lib/resend';
 
 export async function POST(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
@@ -14,16 +14,32 @@ export async function POST(
   }
   const { id } = await params;
   try {
-    const user = await regenerateMemberPin(
-      session.user.role,
-      id,
-      memberRepository,
-      sendAccessPinEmail,
-    );
-    return user
-      ? NextResponse.json({ user, message: 'A new PIN was emailed' })
-      : NextResponse.json({ error: 'User not found' }, { status: 404 });
-  } catch {
-    return NextResponse.json({ error: 'Could not regenerate PIN' }, { status: 500 });
+    const result = await regenerateMemberPin(session.user.role, id, memberRepository);
+    if (!result) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    try {
+      await sendAccessPinEmail(
+        { name: result.user.name, email: result.user.email, pin: result.pin },
+        { loginUrl: request.nextUrl.origin },
+      );
+      return NextResponse.json({
+        user: result.user,
+        emailed: true,
+        message: 'A new PIN was emailed',
+      });
+    } catch (error) {
+      const emailError = error instanceof Error ? error.message : 'Email failed';
+      return NextResponse.json({
+        user: result.user,
+        emailed: false,
+        pin: result.pin,
+        message: `PIN updated, but email failed: ${emailError}. New PIN: ${result.pin}`,
+      });
+    }
+  } catch (error) {
+    console.error('regenerate PIN failed', error);
+    const message = error instanceof Error ? error.message : 'Could not regenerate PIN';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

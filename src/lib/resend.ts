@@ -8,27 +8,52 @@ function escapeHtml(value: string): string {
   })[character] ?? character);
 }
 
-export async function sendAccessPinEmail(input: {
-  name: string;
-  email: string;
-  pin: string;
-}): Promise<void> {
+export function resolveAppLoginUrl(fallbackOrigin?: string): string | null {
+  const configured =
+    process.env.NEXT_PUBLIC_APP_URL
+    || process.env.AUTH_URL
+    || process.env.NEXTAUTH_URL
+    || (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : null)
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+    || fallbackOrigin
+    || null;
+  return configured ? configured.replace(/\/$/, '') : null;
+}
+
+export function resendConfigError(): string | null {
+  if (!process.env.RESEND_API_KEY) return 'RESEND_API_KEY is not set in Vercel env.';
+  if (!(process.env.RESEND_FROM || process.env.EMAIL_FROM)) {
+    return 'EMAIL_FROM / RESEND_FROM is not set in Vercel env.';
+  }
+  if (!resolveAppLoginUrl()) {
+    return 'App URL is not set (NEXT_PUBLIC_APP_URL, AUTH_URL, or NEXTAUTH_URL).';
+  }
+  return null;
+}
+
+export async function sendAccessPinEmail(
+  input: {
+    name: string;
+    email: string;
+    pin: string;
+  },
+  options?: { loginUrl?: string | null },
+): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM || process.env.EMAIL_FROM;
-  const loginUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.AUTH_URL ||
-    process.env.NEXTAUTH_URL;
+  const loginUrl = resolveAppLoginUrl(options?.loginUrl || undefined);
 
   if (!apiKey || !from || !loginUrl) {
-    throw new Error('Resend sender or application URL is not configured');
+    throw new Error(resendConfigError() || 'Resend sender or application URL is not configured');
   }
 
   const email = escapeHtml(input.email);
   const name = escapeHtml(input.name);
   const pin = escapeHtml(input.pin);
-  const url = escapeHtml(`${loginUrl.replace(/\/$/, '')}/signin`);
-  const textUrl = `${loginUrl.replace(/\/$/, '')}/signin`;
+  const url = escapeHtml(`${loginUrl}/signin`);
+  const textUrl = `${loginUrl}/signin`;
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -108,6 +133,14 @@ export async function sendAccessPinEmail(input: {
   });
 
   if (!response.ok) {
-    throw new Error(`Resend rejected the invitation email (${response.status})`);
+    const detail = await response.text().catch(() => '');
+    let reason = `Resend rejected the invitation email (${response.status})`;
+    try {
+      const parsed = JSON.parse(detail) as { message?: string; error?: string };
+      if (parsed.message || parsed.error) reason = parsed.message || parsed.error || reason;
+    } catch {
+      if (detail) reason = `${reason}: ${detail.slice(0, 180)}`;
+    }
+    throw new Error(reason);
   }
 }

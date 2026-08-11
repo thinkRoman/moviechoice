@@ -1,5 +1,6 @@
 import dbConnect from '@/lib/mongodb';
 import User from '@/models/User';
+import { ensureUserProfile } from '@/lib/user-profile';
 import type {
   MemberCredentials,
   MemberRepository,
@@ -42,12 +43,18 @@ export const memberRepository: MemberRepository = {
       pinSalt: user.pinSalt,
       role: user.role,
       status: user.status,
-    };
+      };
   },
 
   async create(input) {
     await dbConnect();
     const user = await User.create(input);
+    // Each invited PIN user gets their own Profile for settings + recommendation history.
+    try {
+      await ensureUserProfile(user._id.toString(), user.name);
+    } catch (error) {
+      console.error('ensureUserProfile after invite failed', error);
+    }
     return toSafeUser(user);
   },
 
