@@ -350,35 +350,45 @@ export default function RecommendationStudio() {
             <p className="truncate text-base font-black tracking-tight text-zinc-950">Movies & Shows Picks</p>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-violet-500">Week of {weekLabel()}</p>
           </div>
-          <button
-            type="button"
-            aria-label="Open menu"
-            onClick={() => setMenuOpen((open) => !open)}
-            className={`flex h-10 w-10 items-center justify-center rounded-xl transition shadow-md ${
-              menuOpen
-                ? 'bg-violet-700 text-white shadow-violet-400/50'
-                : 'bg-violet-600 text-white shadow-violet-300/40 hover:bg-violet-500'
-            }`}
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-        </div>
-        {menuOpen ? (
-          <div className="mx-auto max-w-3xl space-y-1 border-t border-violet-100 bg-[#f3eefc]/95 px-4 py-3 backdrop-blur-sm sm:px-6">
-            <Link href="/" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-white hover:shadow-sm">
-              <Home className="h-4 w-4 text-violet-600" /> Home
-            </Link>
-            <Link href="/my-movies" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-white hover:shadow-sm">
-              <Sparkles className="h-4 w-4 text-violet-600" /> My Movies
-            </Link>
-            <Link href="/settings" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-white hover:shadow-sm">
-              <Settings className="h-4 w-4 text-violet-600" /> Edit saved settings
-            </Link>
-            <button type="button" onClick={clearHistory} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-zinc-700 transition hover:bg-white hover:shadow-sm">
-              <RefreshCw className="h-4 w-4 text-violet-600" /> Fresh start (clear pick history)
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Open menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+              className={`flex h-10 w-10 items-center justify-center rounded-xl transition shadow-md ${
+                menuOpen
+                  ? 'bg-violet-700 text-white shadow-violet-400/50'
+                  : 'bg-violet-600 text-white shadow-violet-300/40 hover:bg-violet-500'
+              }`}
+            >
+              <Menu className="h-5 w-5" />
             </button>
+            {menuOpen ? (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-xl shadow-violet-300/20">
+                  <div className="p-2">
+                    <Link href="/" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-violet-50">
+                      <Home className="h-4 w-4 text-violet-500" /> Home
+                    </Link>
+                    <Link href="/my-movies" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-violet-50">
+                      <Sparkles className="h-4 w-4 text-violet-500" /> My Movies
+                    </Link>
+                    <Link href="/settings" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-violet-50">
+                      <Settings className="h-4 w-4 text-violet-500" /> Edit saved settings
+                    </Link>
+                  </div>
+                  <div className="border-t border-violet-100 p-2">
+                    <button type="button" onClick={() => { setMenuOpen(false); clearHistory(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50">
+                      <RefreshCw className="h-4 w-4" /> Fresh start
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </header>
 
       <div className="relative mx-auto max-w-3xl px-4 pb-36 pt-8 sm:px-6">
