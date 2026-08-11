@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Search, Settings, Sparkles, UserPlus } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import MobileBottomNav from '@/components/mobile-bottom-nav';
+import SignOutButton from '@/components/sign-out-button';
 
 export default async function SiteHeader() {
   const session = await auth();
@@ -23,6 +24,7 @@ export default async function SiteHeader() {
         <Link href="/settings" aria-label="Personalization settings" className="hidden shrink-0 text-zinc-400 transition hover:text-white sm:block">
           <Settings className="h-4 w-4" />
         </Link>
+        {session?.user ? <SignOutButton className="hidden shrink-0 text-zinc-400 sm:block" /> : null}
         {isOwner ? (
           <Link href="/settings/user-access" className="hidden shrink-0 items-center gap-1.5 text-sm font-semibold text-zinc-300 transition hover:text-white sm:flex">
             <UserPlus className="h-4 w-4" /> Invite

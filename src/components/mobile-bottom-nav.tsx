@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Bookmark, Clapperboard, Compass, Settings, Sparkles, UserPlus } from 'lucide-react';
+import { Bookmark, Clapperboard, Compass, LogOut, Settings, Sparkles, UserPlus } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 
 const NAV_ITEMS = [
   { href: '/for-you', label: 'Picks', icon: Sparkles },
@@ -26,7 +27,7 @@ export default function MobileBottomNav({ isOwner }: { isOwner: boolean }) {
           : 'border-t border-white/10 bg-[#0d0b11]/95 shadow-[0_-12px_40px_rgba(0,0,0,0.35)]'
       }`}
     >
-      <div className="mx-auto grid max-w-md grid-cols-5">
+      <div className="mx-auto grid max-w-md grid-cols-6">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = href === '/' ? pathname === href : pathname.startsWith(href);
           const ownerInvite = isOwner && label === 'Settings';
@@ -51,6 +52,14 @@ export default function MobileBottomNav({ isOwner }: { isOwner: boolean }) {
             </Link>
           );
         })}
+        <button
+          onClick={() => signOut({ callbackUrl: '/' })}
+          className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[10px] font-bold transition text-zinc-500 active:bg-white/5 active:text-red-400"
+          aria-label="Sign out"
+        >
+          <LogOut className="h-5 w-5" />
+          <span>Sign Out</span>
+        </button>
       </div>
     </nav>
   );
