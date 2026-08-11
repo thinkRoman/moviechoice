@@ -28,6 +28,9 @@ export interface SafeAccessUser {
   role: UserRole;
   status: UserStatus;
   monthlyAiLimitUsd: number | null;
+  countryCode: string;
+  whatsappNumber: string;
+  notifyVia: 'email' | 'whatsapp' | 'both';
   createdAt: string;
   lastLoginAt: string | null;
 }

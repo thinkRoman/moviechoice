@@ -15,6 +15,9 @@ export interface IUser {
   status: UserStatus;
   monthlyAiLimitUsd?: number;
   lastLoginAt: Date | null;
+  countryCode: string;
+  whatsappNumber: string;
+  notifyVia: 'email' | 'whatsapp' | 'both';
   providers: {
     google?: {
       providerAccountId: string;
@@ -41,6 +44,9 @@ const UserSchema = new Schema<IUser>(
     status: { type: String, enum: ['ACTIVE', 'SUSPENDED'], default: 'ACTIVE', required: true },
     monthlyAiLimitUsd: { type: Number, min: 0 },
     lastLoginAt: { type: Date, default: null },
+    countryCode: { type: String, default: '+1' },
+    whatsappNumber: { type: String, default: '' },
+    notifyVia: { type: String, enum: ['email', 'whatsapp', 'both'], default: 'email' },
     providers: {
       google: {
         providerAccountId: { type: String, sparse: true, index: true },

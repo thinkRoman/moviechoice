@@ -15,6 +15,9 @@ function toSafeUser(user: {
   role: 'OWNER' | 'MEMBER';
   status: UserStatus;
   monthlyAiLimitUsd?: number;
+  countryCode?: string;
+  whatsappNumber?: string;
+  notifyVia?: 'email' | 'whatsapp' | 'both';
   createdAt: Date;
   lastLoginAt?: Date | null;
 }): SafeAccessUser {
@@ -25,6 +28,9 @@ function toSafeUser(user: {
     role: user.role,
     status: user.status,
     monthlyAiLimitUsd: user.monthlyAiLimitUsd ?? null,
+    countryCode: user.countryCode ?? '+1',
+    whatsappNumber: user.whatsappNumber ?? '',
+    notifyVia: user.notifyVia ?? 'email',
     createdAt: user.createdAt.toISOString(),
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
   };
