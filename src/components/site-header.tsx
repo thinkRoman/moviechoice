@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Search, Settings, Sparkles, UserPlus } from 'lucide-react';
+import { Home, Search, Settings, Sparkles, UserPlus } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import MobileBottomNav from '@/components/mobile-bottom-nav';
 import SignOutButton from '@/components/sign-out-button';
@@ -14,6 +14,9 @@ export default async function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="shrink-0 text-lg font-black tracking-tight text-white">
           MOVIE<span className="text-violet-400">CHOICE</span>
+        </Link>
+        <Link href="/" aria-label="Home" className="hidden shrink-0 items-center justify-center rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-white sm:flex">
+          <Home className="h-4 w-4" />
         </Link>
         <nav className="hidden items-center gap-1 sm:flex">
           <Link href="/my-movies" className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-300 transition hover:text-white">
