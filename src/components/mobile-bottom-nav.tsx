@@ -56,6 +56,7 @@ export default function MobileBottomNav({ isOwner }: { isOwner: boolean }) {
           onClick={() => signOut({ callbackUrl: '/' })}
           className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[10px] font-bold transition text-zinc-500 active:bg-white/5 active:text-red-400"
           aria-label="Sign out"
+          title="Sign out"
         >
           <LogOut className="h-5 w-5" />
           <span>Sign Out</span>
