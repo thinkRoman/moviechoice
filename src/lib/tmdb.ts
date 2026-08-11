@@ -482,6 +482,60 @@ export function filterFutureReleases<T extends { releaseDate: string | null }>(
   });
 }
 
+/** How far back “What’s new on streaming” looks for recent releases/premieres. */
+export const WHATS_NEW_LOOKBACK_DAYS = 60;
+
+export function whatsNewDateWindow(today = new Date(), lookbackDays = WHATS_NEW_LOOKBACK_DAYS) {
+  const todayStr = utcDateString(today);
+  const sinceStr = utcDateString(addUtcDays(today, -Math.max(1, lookbackDays)));
+  return { todayStr, sinceStr, lookbackDays: Math.max(1, lookbackDays) };
+}
+
+/**
+ * Recent movies + shows available on a US flatrate provider.
+ * Proxy for “new on streaming”: TMDB has no true “date added to Netflix”, so we
+ * use recent primary release / first air dates within the lookback window.
+ */
+export async function getWhatsNewOnProvider(
+  providerId: number,
+  today = new Date(),
+  options: { lookbackDays?: number; limit?: number } = {},
+): Promise<DiscoverTitle[]> {
+  const lookbackDays = options.lookbackDays ?? WHATS_NEW_LOOKBACK_DAYS;
+  const limit = options.limit ?? 18;
+  const { todayStr, sinceStr } = whatsNewDateWindow(today, lookbackDays);
+  const provider = String(providerId);
+
+  const [movies, shows] = await Promise.all([
+    discoverTitles('movie', {
+      with_watch_providers: provider,
+      sort_by: 'popularity.desc',
+      'primary_release_date.gte': sinceStr,
+      'primary_release_date.lte': todayStr,
+      'vote_count.gte': '20',
+    }),
+    discoverTitles('tv', {
+      with_watch_providers: provider,
+      sort_by: 'popularity.desc',
+      'first_air_date.gte': sinceStr,
+      'first_air_date.lte': todayStr,
+      'vote_count.gte': '10',
+    }),
+  ]);
+
+  const byKey = new Map<string, DiscoverTitle>();
+  for (const title of [...movies, ...shows]) {
+    const key = `${title.mediaType}:${title.id}`;
+    if (byKey.has(key)) continue;
+    if (!title.releaseDate || title.releaseDate < sinceStr || title.releaseDate > todayStr) continue;
+    byKey.set(key, title);
+  }
+
+  return [...byKey.values()]
+    .toSorted((a, b) => b.popularity - a.popularity || (b.releaseDate || '').localeCompare(a.releaseDate || ''))
+    .slice(0, Math.max(1, limit));
+}
+
 /**
  * US theatrical releases still ahead of today.
  * Uses discover (not raw /movie/upcoming) so already-in-theaters titles are excluded.
