@@ -5,11 +5,13 @@ import { changeMemberStatus } from '@/lib/access';
 import { memberRepository } from '@/lib/member-repository';
 import dbConnect from '@/lib/mongodb';
 import User from '@/models/User';
+import { normalizeEmail } from '@/lib/pin';
 
 const statusSchema = z.object({ status: z.enum(['ACTIVE', 'SUSPENDED']) });
 
 const editSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
+  email: z.string().email().transform(normalizeEmail).optional(),
   countryCode: z.string().optional(),
   whatsappNumber: z.string().optional(),
   notifyVia: z.enum(['email', 'whatsapp', 'both']).optional(),
@@ -52,6 +54,7 @@ export async function PATCH(
       await dbConnect();
       const updates: Record<string, string> = {};
       if (editParsed.data.name !== undefined) updates.name = editParsed.data.name;
+      if (editParsed.data.email !== undefined) updates.email = editParsed.data.email;
       if (editParsed.data.countryCode !== undefined) updates.countryCode = editParsed.data.countryCode;
       if (editParsed.data.whatsappNumber !== undefined) updates.whatsappNumber = editParsed.data.whatsappNumber;
       if (editParsed.data.notifyVia !== undefined) updates.notifyVia = editParsed.data.notifyVia;

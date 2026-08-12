@@ -63,6 +63,7 @@ export default function UserAccessClient() {
   const [busy, setBusy] = useState(false);
   const [editingUser, setEditingUser] = useState<SafeAccessUser | null>(null);
   const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editCountryCode, setEditCountryCode] = useState('+1');
   const [editWhatsapp, setEditWhatsapp] = useState('');
   const [editNotifyVia, setEditNotifyVia] = useState<'email' | 'whatsapp' | 'both'>('email');
@@ -158,6 +159,7 @@ export default function UserAccessClient() {
   function openEdit(user: SafeAccessUser) {
     setEditingUser(user);
     setEditName(user.name);
+    setEditEmail(user.email);
     setEditCountryCode(user.countryCode || '+1');
     setEditWhatsapp(user.whatsappNumber || '');
     setEditNotifyVia(user.notifyVia || 'email');
@@ -182,6 +184,7 @@ export default function UserAccessClient() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: editName.trim(),
+        email: editEmail.trim(),
         countryCode: editCountryCode,
         whatsappNumber: editWhatsapp.trim(),
         notifyVia: editNotifyVia,
@@ -437,6 +440,21 @@ export default function UserAccessClient() {
                     required
                     value={editName}
                     onChange={(event) => setEditName(event.target.value)}
+                    className="w-full bg-transparent py-3.5 text-sm text-white outline-none"
+                  />
+                </span>
+              </label>
+
+              {/* Email */}
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Email</span>
+                <span className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/30 px-3">
+                  <Mail className="h-4 w-4 shrink-0 text-zinc-500" />
+                  <input
+                    required
+                    type="email"
+                    value={editEmail}
+                    onChange={(event) => setEditEmail(event.target.value)}
                     className="w-full bg-transparent py-3.5 text-sm text-white outline-none"
                   />
                 </span>
